@@ -601,7 +601,7 @@ function renderNextEnvList(envVars: ModuleEnvVar[]): string {
           target="_blank"
           rel="noreferrer"
         >
-          Get keys ->
+          Get keys &gt;
         </a>`
         : '';
       return `
@@ -926,7 +926,7 @@ export function EnvList() {
               color={fg}
               onPress={() => Linking.openURL(item.url)}
             >
-              Get keys ->
+              Get keys
             </Text>
           ) : null}
         </YStack>
