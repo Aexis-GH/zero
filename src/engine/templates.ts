@@ -73,6 +73,18 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
       content: nextEnvListTemplate(envList)
     },
     {
+      path: `${base}components/ui/button.tsx`,
+      content: nextButtonTemplate()
+    },
+    {
+      path: `${base}components/ui/input.tsx`,
+      content: nextInputTemplate()
+    },
+    {
+      path: `${base}components/ui/textarea.tsx`,
+      content: nextTextareaTemplate()
+    },
+    {
       path: `${base}lib/utils.ts`,
       content: nextUtilsTemplate()
     }
@@ -350,7 +362,9 @@ function nextFooterTemplate(domain: string): string {
 }
 
 function nextEnvListTemplate(envList: string): string {
-  return `export function EnvList() {
+  return `import { Button } from '@/components/ui/button';
+
+export function EnvList() {
   return (
     <div className="mt-4 flex flex-col gap-4">
       ${envList}
@@ -370,10 +384,93 @@ export function cn(...inputs: ClassValue[]) {
 `;
 }
 
+function nextButtonTemplate(): string {
+  return `import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center text-base font-bold transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default: 'border-b border-[var(--fg)]',
+        link: 'underline underline-offset-4'
+      }
+    },
+    defaultVariants: {
+      variant: 'link'
+    }
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button';
+    return <Comp className={cn(buttonVariants({ variant, className }))} ref={ref} {...props} />;
+  }
+);
+Button.displayName = 'Button';
+
+export { Button, buttonVariants };
+`;
+}
+
+function nextInputTemplate(): string {
+  return `import * as React from 'react';
+import { cn } from '@/lib/utils';
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, ...props }, ref) => (
+  <input
+    ref={ref}
+    className={cn('border-b border-[var(--fg)] bg-transparent py-1 text-base focus-visible:outline-none', className)}
+    {...props}
+  />
+));
+Input.displayName = 'Input';
+
+export { Input };
+`;
+}
+
+function nextTextareaTemplate(): string {
+  return `import * as React from 'react';
+import { cn } from '@/lib/utils';
+
+export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => (
+  <textarea
+    ref={ref}
+    className={cn(
+      'min-h-[96px] border-b border-[var(--fg)] bg-transparent py-1 text-base focus-visible:outline-none',
+      className
+    )}
+    {...props}
+  />
+));
+Textarea.displayName = 'Textarea';
+
+export { Textarea };
+`;
+}
+
 function nextContactFormTemplate(): string {
   return `'use client';
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -442,40 +539,19 @@ export function ContactForm() {
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-base font-bold">Name</span>
-        <input
-          className="border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
-          value={form.name}
-          onChange={updateField('name')}
-          type="text"
-          autoComplete="name"
-        />
+        <Input value={form.name} onChange={updateField('name')} type="text" autoComplete="name" />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-base font-bold">Email</span>
-        <input
-          className="border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
-          value={form.email}
-          onChange={updateField('email')}
-          type="email"
-          autoComplete="email"
-        />
+        <Input value={form.email} onChange={updateField('email')} type="email" autoComplete="email" />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-base font-bold">Message</span>
-        <textarea
-          className="min-h-[96px] border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
-          value={form.message}
-          onChange={updateField('message')}
-          rows={4}
-        />
+        <Textarea value={form.message} onChange={updateField('message')} rows={4} />
       </label>
-      <button
-        className="self-start text-base font-bold underline underline-offset-4"
-        type="submit"
-        disabled={status === 'sending'}
-      >
+      <Button className="self-start" type="submit" disabled={status === 'sending'}>
         {status === 'sending' ? 'Sending...' : 'Send message'}
-      </button>
+      </Button>
       {status === 'sent' ? (
         <p className="text-base" role="status">
           Message sent.
@@ -620,14 +696,15 @@ function renderNextEnvList(envVars: ModuleEnvVar[]): string {
     .map((item) => {
       const link = item.url
         ? `
-        <a
-          className="inline-flex text-base underline underline-offset-4"
-          href="${escapeAttribute(item.url)}"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Get keys &gt;
-        </a>`
+        <Button asChild variant="link">
+          <a
+            href="${escapeAttribute(item.url)}"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Get keys &gt;
+          </a>
+        </Button>`
         : '';
       return `
       <div className="flex flex-col gap-2">
@@ -648,6 +725,7 @@ function renderNextConnectionSection(_connections: ModuleConnection[]): string {
 function nextConnectionGuideTemplate(connections: ModuleConnection[]): string {
   const items = renderConnectionItems(connections);
   return `import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 const connections = ${items};
 
@@ -661,19 +739,18 @@ export function ConnectionGuide() {
       <h2 className="text-base font-bold">Connection guide</h2>
       {connections.map((item) => (
         <div key={item.label} className="flex flex-col gap-1">
-          <Link
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-base font-bold underline underline-offset-4"
-          >
-            {item.label}
-          </Link>
+          <Button asChild variant="link">
+            <Link href={item.url} target="_blank" rel="noreferrer">
+              {item.label}
+            </Link>
+          </Button>
           <p className="text-base">
             or go to{' '}
-            <Link href={item.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-              {item.url}
-            </Link>{' '}
+            <Button asChild variant="link">
+              <Link href={item.url} target="_blank" rel="noreferrer">
+                {item.url}
+              </Link>
+            </Button>{' '}
             directly.
           </p>
         </div>
