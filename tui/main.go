@@ -286,10 +286,10 @@ func (m model) View() string {
 	asciiZero := `
   ___  
  / _ \ 
-| |/ /
-|  < 
-| |\ \
-|_| \_\
+| / /|
+|/ / |
+|\ \ |
+ \_\_\
 `
 
 	header := accent.Render(asciiZero) + "\n" + accent.Render("ZER0") + "  " + base.Render("Aexis Zero")
