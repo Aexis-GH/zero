@@ -11,7 +11,7 @@ npm install -g @aex.is/zero
 ## Install (Homebrew)
 
 ```sh
-brew install aexis/homebrew-zero/zero
+brew install aexis-gh/homebrew-zero/zero
 ```
 
 ## Usage
