@@ -282,7 +282,16 @@ func (m model) View() string {
 	muted := lipgloss.NewStyle().Foreground(m.muted)
 	accent := lipgloss.NewStyle().Foreground(m.accent)
 
-	header := accent.Render("ZER0") + "  " + base.Render("Aexis Zero")
+	asciiZero := `
+  ___  
+ / _ \ 
+| |/ /
+|  < 
+| |\ \
+|_| \_\
+`
+
+	header := accent.Render(asciiZero) + "\n" + accent.Render("ZER0") + "  " + base.Render("Aexis Zero")
 	divider := strings.Repeat("-", 42)
 
 	content := ""
