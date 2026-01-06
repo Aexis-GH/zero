@@ -422,7 +422,7 @@ export function ContactForm() {
         />
       </label>
       <button
-        className="self-start text-base font-bold underline underline-offset-4 disabled:opacity-60"
+        className="self-start text-base font-bold underline underline-offset-4"
         type="submit"
         disabled={status === 'sending'}
       >
@@ -962,6 +962,7 @@ export function ContactForm() {
         paddingHorizontal={0}
         paddingVertical={0}
         alignSelf=\"flex-start\"
+        disabled={status === 'sending'}
         onPress={submit}
       >
         <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg} textDecorationLine=\"underline\">
