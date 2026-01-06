@@ -1,5 +1,5 @@
 import path from 'path';
-import { promises as fs } from 'fs';
+import { constants as fsConstants, promises as fs } from 'fs';
 import { execa } from 'execa';
 import type { ProjectConfig } from '../types.js';
 import { getFrameworkDefinition } from '../config/frameworks.js';
@@ -88,6 +88,7 @@ async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
     if (!stat.isDirectory()) {
       throw new Error('Target path exists and is not a directory.');
     }
+    await assertWritable(targetDir);
     const entries = await fs.readdir(targetDir);
     const allowed = new Set(['.git', '.gitignore', '.gitkeep']);
     const remaining = entries.filter((entry) => !allowed.has(entry));
@@ -96,9 +97,29 @@ async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
     }
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') {
-      return;
+      try {
+        await fs.mkdir(targetDir, { recursive: true });
+        await assertWritable(targetDir);
+        return;
+      } catch (createError) {
+        if (isErrnoException(createError) && (createError.code === 'EACCES' || createError.code === 'EPERM')) {
+          throw new Error('Cannot create target directory. Check your permissions and try again.');
+        }
+        throw createError;
+      }
+    }
+    if (isErrnoException(error) && (error.code === 'EACCES' || error.code === 'EPERM')) {
+      throw new Error('Target directory is not writable. Check your permissions and try again.');
     }
     throw error;
+  }
+}
+
+async function assertWritable(targetDir: string): Promise<void> {
+  try {
+    await fs.access(targetDir, fsConstants.W_OK);
+  } catch {
+    throw new Error('Target directory is not writable. Check your permissions and try again.');
   }
 }
 
