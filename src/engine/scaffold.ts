@@ -183,15 +183,17 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
   const srcAppDir = path.join(targetDir, 'src', 'app');
   const usesSrcDir = await pathExists(srcAppDir);
   const basePath = usesSrcDir ? 'src' : '';
-  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
+  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules, config.framework));
   const connections = getModuleConnections(config.modules);
+  const includeContact = config.modules.includes('email');
 
   const files = buildNextTemplateFiles({
     appName: config.appName,
     domain: config.domain,
     envVars: envHelp,
     connections,
-    basePath
+    basePath,
+    includeContact
   });
 
   await writeTemplateFiles(targetDir, files);
@@ -206,14 +208,16 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
 }
 
 async function applyExpoTemplates(config: ProjectConfig, targetDir: string): Promise<void> {
-  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
+  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules, config.framework));
   const connections = getModuleConnections(config.modules);
+  const includeContact = config.modules.includes('email');
   const files = buildExpoTemplateFiles({
     appName: config.appName,
     domain: config.domain,
     envVars: envHelp,
     connections,
-    basePath: ''
+    basePath: '',
+    includeContact
   });
 
   await writeTemplateFiles(targetDir, files);

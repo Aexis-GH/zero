@@ -1,28 +1,9 @@
 import type { FrameworkId } from '../types.js';
 import type { ModuleEnvVar } from './modules.js';
 
-const nextBaseEnv: ModuleEnvVar[] = [
-  {
-    key: 'RESEND_API_KEY',
-    description: 'Resend API key',
-    url: 'https://resend.com'
-  },
-  {
-    key: 'CONTACT_FROM_EMAIL',
-    description: 'Verified sender email address'
-  },
-  {
-    key: 'CONTACT_TO_EMAIL',
-    description: 'Destination email address'
-  }
-];
+const nextBaseEnv: ModuleEnvVar[] = [];
 
-const expoBaseEnv: ModuleEnvVar[] = [
-  {
-    key: 'EXPO_PUBLIC_CONTACT_ENDPOINT',
-    description: 'Contact API endpoint (e.g. https://yourdomain.com/api/contact)'
-  }
-];
+const expoBaseEnv: ModuleEnvVar[] = [];
 
 export function getBaseEnvHelp(framework: FrameworkId): ModuleEnvVar[] {
   return framework === 'nextjs' ? nextBaseEnv : expoBaseEnv;

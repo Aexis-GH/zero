@@ -9,7 +9,7 @@ export async function writeEnvExample(
   framework: FrameworkId,
   targetDir: string
 ): Promise<void> {
-  const envVars = [...getBaseEnvVars(framework), ...getModuleEnvVars(moduleIds)];
+  const envVars = [...getBaseEnvVars(framework), ...getModuleEnvVars(moduleIds, framework)];
   const unique = Array.from(new Set(envVars));
   const lines = unique.map((key) => `${key}=`);
   const content = lines.length > 0 ? `${lines.join('\n')}\n` : '';

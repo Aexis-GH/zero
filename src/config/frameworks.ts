@@ -20,7 +20,6 @@ export const frameworks: FrameworkDefinition[] = [
       'class-variance-authority',
       'clsx',
       'lucide-react',
-      'resend',
       'tailwind-merge',
       'tailwindcss-animate',
       '@radix-ui/react-slot'

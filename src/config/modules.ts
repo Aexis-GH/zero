@@ -4,6 +4,7 @@ export interface ModuleEnvVar {
   key: string;
   description: string;
   url?: string;
+  frameworks?: FrameworkId[];
 }
 
 export interface ModuleConnection {
@@ -115,6 +116,43 @@ export const modules: ModuleDefinition[] = [
       nextjs: ['stripe'],
       expo: ['stripe']
     }
+  },
+  {
+    id: 'email',
+    label: 'Email',
+    description: 'Contact form email via Resend.',
+    connect: {
+      label: 'Connect to Resend',
+      url: 'https://resend.com/api-keys'
+    },
+    envVars: [
+      {
+        key: 'RESEND_API_KEY',
+        description: 'Resend API key',
+        url: 'https://resend.com/api-keys',
+        frameworks: ['nextjs']
+      },
+      {
+        key: 'CONTACT_FROM_EMAIL',
+        description: 'Verified sender email address',
+        url: 'https://resend.com/domains',
+        frameworks: ['nextjs']
+      },
+      {
+        key: 'CONTACT_TO_EMAIL',
+        description: 'Destination email address',
+        frameworks: ['nextjs']
+      },
+      {
+        key: 'EXPO_PUBLIC_CONTACT_ENDPOINT',
+        description: 'Contact API endpoint (e.g. https://yourdomain.com/api/contact)',
+        frameworks: ['expo']
+      }
+    ],
+    packages: {
+      nextjs: ['resend'],
+      expo: []
+    }
   }
 ];
 
@@ -137,22 +175,28 @@ export function getModulePackages(moduleIds: ModuleId[], framework: FrameworkId)
   return Array.from(packages).sort();
 }
 
-export function getModuleEnvVars(moduleIds: ModuleId[]): string[] {
+export function getModuleEnvVars(moduleIds: ModuleId[], framework: FrameworkId): string[] {
   const envVars = new Set<string>();
   for (const id of moduleIds) {
     const module = getModuleDefinition(id);
     for (const envVar of module.envVars) {
+      if (!supportsFramework(envVar, framework)) {
+        continue;
+      }
       envVars.add(envVar.key);
     }
   }
   return Array.from(envVars).sort();
 }
 
-export function getModuleEnvHelp(moduleIds: ModuleId[]): ModuleEnvVar[] {
+export function getModuleEnvHelp(moduleIds: ModuleId[], framework: FrameworkId): ModuleEnvVar[] {
   const map = new Map<string, ModuleEnvVar>();
   for (const id of moduleIds) {
     const module = getModuleDefinition(id);
     for (const envVar of module.envVars) {
+      if (!supportsFramework(envVar, framework)) {
+        continue;
+      }
       if (!map.has(envVar.key)) {
         map.set(envVar.key, envVar);
       }
@@ -178,4 +222,11 @@ export function getModuleConnections(moduleIds: ModuleId[]): ModuleConnection[] 
     }
   }
   return connections;
+}
+
+function supportsFramework(envVar: ModuleEnvVar, framework: FrameworkId): boolean {
+  if (!envVar.frameworks || envVar.frameworks.length === 0) {
+    return true;
+  }
+  return envVar.frameworks.includes(framework);
 }

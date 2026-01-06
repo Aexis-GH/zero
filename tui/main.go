@@ -36,7 +36,8 @@ const (
 	frameworkExpo framework = "expo"
 )
 
-var moduleOptions = []module{"neon", "clerk", "payload", "stripe"}
+var moduleOptions = []module{"neon", "clerk", "payload", "stripe", "email"}
+var moduleLabels = []string{"DB", "Auth", "CMS", "Payments", "Email"}
 
 var frameworkOptions = []framework{frameworkNext, frameworkExpo}
 
@@ -317,7 +318,7 @@ func (m model) View() string {
 		content += muted.Render(fmt.Sprintf("Domain: %s", m.domain.Value())) + "\n"
 		content += muted.Render(fmt.Sprintf("Framework: %s", formatFramework(frameworkOptions[m.frameworkIdx]))) + "\n"
 		modulesLabel := "None"
-		if modules := m.selectedModules(); len(modules) > 0 {
+		if modules := m.selectedModuleLabels(); len(modules) > 0 {
 			modulesLabel = strings.Join(modules, ", ")
 		}
 		content += muted.Render(fmt.Sprintf("Modules: %s", modulesLabel)) + "\n\n"
@@ -348,9 +349,8 @@ func renderFrameworkOptions(active int) string {
 }
 
 func renderModuleOptions(active int, selected map[module]bool) string {
-	labels := []string{"Neon", "Clerk", "Payload", "Stripe"}
-	lines := make([]string, 0, len(labels))
-	for i, label := range labels {
+	lines := make([]string, 0, len(moduleLabels))
+	for i, label := range moduleLabels {
 		cursor := " "
 		if i == active {
 			cursor = ">"
@@ -411,6 +411,16 @@ func (m model) selectedModules() []string {
 	for _, mod := range moduleOptions {
 		if m.selected[mod] {
 			selected = append(selected, string(mod))
+		}
+	}
+	return selected
+}
+
+func (m model) selectedModuleLabels() []string {
+	selected := []string{}
+	for i, mod := range moduleOptions {
+		if m.selected[mod] {
+			selected = append(selected, moduleLabels[i])
 		}
 	}
 	return selected

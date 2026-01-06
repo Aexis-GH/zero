@@ -6,6 +6,7 @@ interface TemplateData {
   envVars: ModuleEnvVar[];
   connections: ModuleConnection[];
   basePath: string;
+  includeContact: boolean;
 }
 
 export function componentsJsonTemplate(globalsPath: string, tailwindConfigPath: string): string {
@@ -32,15 +33,16 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
   const base = data.basePath ? `${data.basePath}/` : '';
   const envList = renderNextEnvList(data.envVars);
   const connectionSection = renderNextConnectionSection(data.connections);
+  const includeContact = data.includeContact;
 
-  return [
+  const files: Array<{ path: string; content: string }> = [
     {
       path: `${base}app/layout.tsx`,
       content: nextLayoutTemplate(data.appName, data.domain)
     },
     {
       path: `${base}app/page.tsx`,
-      content: nextHomeTemplate(data.appName, data.domain, envList, connectionSection)
+      content: nextHomeTemplate(data.appName, data.domain, envList, connectionSection, includeContact)
     },
     {
       path: `${base}app/about/page.tsx`,
@@ -51,28 +53,16 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
       content: nextRouteTemplate('Guide', 'Three routes are ready. Customize and ship.')
     },
     {
-      path: `${base}app/contact/page.tsx`,
-      content: nextContactPageTemplate()
-    },
-    {
-      path: `${base}app/api/contact/route.ts`,
-      content: nextContactRouteTemplate(data.appName)
-    },
-    {
       path: `${base}app/globals.css`,
       content: nextGlobalsCss()
     },
     {
       path: `${base}components/site-header.tsx`,
-      content: nextHeaderTemplate(data.appName)
+      content: nextHeaderTemplate(data.appName, includeContact)
     },
     {
       path: `${base}components/site-footer.tsx`,
       content: nextFooterTemplate(data.domain)
-    },
-    {
-      path: `${base}components/contact-form.tsx`,
-      content: nextContactFormTemplate()
     },
     {
       path: `${base}components/connection-guide.tsx`,
@@ -87,23 +77,37 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
       content: nextUtilsTemplate()
     }
   ];
+
+  if (includeContact) {
+    files.splice(4, 0, {
+      path: `${base}app/contact/page.tsx`,
+      content: nextContactPageTemplate()
+    });
+    files.splice(5, 0, {
+      path: `${base}app/api/contact/route.ts`,
+      content: nextContactRouteTemplate(data.appName)
+    });
+    files.push({
+      path: `${base}components/contact-form.tsx`,
+      content: nextContactFormTemplate()
+    });
+  }
+
+  return files;
 }
 
 export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string; content: string }> {
   const envItems = renderExpoEnvItems(data.envVars);
   const connectionItems = renderConnectionItems(data.connections);
-  return [
+  const includeContact = data.includeContact;
+  const files: Array<{ path: string; content: string }> = [
     {
       path: 'app/_layout.tsx',
       content: expoLayoutTemplate()
     },
     {
       path: 'app/index.tsx',
-      content: expoHomeTemplate(data.appName, data.domain, envItems)
-    },
-    {
-      path: 'app/contact.tsx',
-      content: expoContactTemplate()
+      content: expoHomeTemplate(data.appName, data.domain, envItems, includeContact)
     },
     {
       path: 'app/about.tsx',
@@ -119,7 +123,7 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
     },
     {
       path: 'components/site-header.tsx',
-      content: expoHeaderTemplate(data.appName)
+      content: expoHeaderTemplate(data.appName, includeContact)
     },
     {
       path: 'components/site-footer.tsx',
@@ -132,10 +136,6 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
     {
       path: 'components/connection-guide.tsx',
       content: expoConnectionGuideTemplate(connectionItems)
-    },
-    {
-      path: 'components/contact-form.tsx',
-      content: expoContactFormTemplate()
     },
     {
       path: 'components/page-shell.tsx',
@@ -154,6 +154,19 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
       content: babelConfigTemplate()
     }
   ];
+
+  if (includeContact) {
+    files.splice(2, 0, {
+      path: 'app/contact.tsx',
+      content: expoContactTemplate()
+    });
+    files.push({
+      path: 'components/contact-form.tsx',
+      content: expoContactFormTemplate()
+    });
+  }
+
+  return files;
 }
 
 function nextLayoutTemplate(appName: string, domain: string): string {
@@ -204,10 +217,24 @@ export default function RootLayout({
 `;
 }
 
-function nextHomeTemplate(appName: string, domain: string, envList: string, connectionSection: string): string {
+function nextHomeTemplate(
+  appName: string,
+  domain: string,
+  envList: string,
+  connectionSection: string,
+  includeContact: boolean
+): string {
+  const contactImport = includeContact ? "import { ContactForm } from '@/components/contact-form';\n" : '';
+  const contactSection = includeContact ? '\n      <ContactForm />' : '';
+  const routeList = includeContact
+    ? `Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code>,{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>, and{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/contact</code>.`
+    : `Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code> and{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>.`;
+
   return `import { EnvList } from '@/components/env-list';
-import { ContactForm } from '@/components/contact-form';
-import { ConnectionGuide } from '@/components/connection-guide';
+${contactImport}import { ConnectionGuide } from '@/components/connection-guide';
 
 export const metadata = {
   title: 'Home',
@@ -235,12 +262,10 @@ export default function Home() {
       <div className="flex flex-col gap-2">
         <h2 className="text-base font-bold">Routes</h2>
         <p className="text-base">
-          Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code>,{' '}
-          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>, and{' '}
-          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/contact</code>.
+          ${routeList}
         </p>
       </div>
-      <ContactForm />
+      ${contactSection}
     </section>
   );
 }
@@ -264,14 +289,14 @@ export default function Page() {
 `;
 }
 
-function nextHeaderTemplate(appName: string): string {
+function nextHeaderTemplate(appName: string, includeContact: boolean): string {
+  const contactLink = includeContact ? "\n  { href: '/contact', label: 'Contact' }" : '';
   return `import Link from 'next/link';
 
 const links = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/guide', label: 'Guide' },
-  { href: '/contact', label: 'Contact' }
+  { href: '/guide', label: 'Guide' },${contactLink}
 ];
 
 export function SiteHeader({ appName }: { appName: string }) {
@@ -685,13 +710,17 @@ export default function RootLayout() {
 `;
 }
 
-function expoHomeTemplate(appName: string, domain: string, envItems: string): string {
+function expoHomeTemplate(appName: string, domain: string, envItems: string, includeContact: boolean): string {
+  const contactImport = includeContact ? "import { ContactForm } from '../components/contact-form';\n" : '';
+  const contactSection = includeContact ? '\n      <ContactForm />' : '';
+  const routeLine = includeContact ? 'Visit /about, /guide, and /contact.' : 'Visit /about and /guide.';
+
   return `import { Head } from 'expo-router/head';
 import { Text, YStack } from 'tamagui';
 import { PageShell } from '../components/page-shell';
 import { EnvList } from '../components/env-list';
 import { ConnectionGuide } from '../components/connection-guide';
-import { ContactForm } from '../components/contact-form';
+${contactImport}
 import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from '../components/theme';
 
 export default function Home() {
@@ -722,10 +751,10 @@ export default function Home() {
           Routes
         </Text>
         <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
-          Visit /about, /guide, and /contact.
+          ${routeLine}
         </Text>
       </YStack>
-      <ContactForm />
+      ${contactSection}
     </PageShell>
   );
 }
@@ -805,7 +834,8 @@ export function useThemeColors() {
 `;
 }
 
-function expoHeaderTemplate(appName: string): string {
+function expoHeaderTemplate(appName: string, includeContact: boolean): string {
+  const contactLink = includeContact ? "\n  { href: '/contact', label: 'Contact' }" : '';
   return `import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Button, Text, XStack, YStack } from 'tamagui';
@@ -814,8 +844,7 @@ import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/guide', label: 'Guide' },
-  { href: '/contact', label: 'Contact' }
+  { href: '/guide', label: 'Guide' },${contactLink}
 ];
 
 export function SiteHeader() {
