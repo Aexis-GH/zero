@@ -49,6 +49,10 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
       content: nextRouteTemplate('Guide', 'Three routes are ready. Customize and ship.')
     },
     {
+      path: `${base}app/api/contact/route.ts`,
+      content: nextContactRouteTemplate(data.appName)
+    },
+    {
       path: `${base}app/globals.css`,
       content: nextGlobalsCss()
     },
@@ -59,6 +63,10 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
     {
       path: `${base}components/site-footer.tsx`,
       content: nextFooterTemplate(data.domain)
+    },
+    {
+      path: `${base}components/contact-form.tsx`,
+      content: nextContactFormTemplate()
     },
     {
       path: `${base}components/env-list.tsx`,
@@ -107,6 +115,10 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
       content: expoEnvListTemplate(envItems)
     },
     {
+      path: 'components/contact-form.tsx',
+      content: expoContactFormTemplate()
+    },
+    {
       path: 'components/page-shell.tsx',
       content: expoPageShellTemplate()
     },
@@ -126,14 +138,31 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
 }
 
 function nextLayoutTemplate(appName: string, domain: string): string {
+  const description = `${escapeTemplate(appName)} starter crafted by Aexis Zero.`;
+  const domainValue = escapeTemplate(domain);
+  const metadataBase = domainValue ? `new URL('https://${domainValue}')` : 'undefined';
   return `import type { ReactNode } from 'react';
 import './globals.css';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 
 export const metadata = {
-  title: '${escapeTemplate(appName)}',
-  description: 'Scaffolded by Aexis Zero.'
+  title: {
+    default: '${escapeTemplate(appName)}',
+    template: '%s | ${escapeTemplate(appName)}'
+  },
+  description: '${description}',
+  metadataBase: ${metadataBase},
+  openGraph: {
+    title: '${escapeTemplate(appName)}',
+    description: '${description}',
+    type: 'website'
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '${escapeTemplate(appName)}',
+    description: '${description}'
+  }
 };
 
 export default function RootLayout({
@@ -146,7 +175,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
         <div className="flex min-h-screen flex-col">
           <SiteHeader appName="${escapeTemplate(appName)}" />
-          <main className="flex-1">{children}</main>
+          <main className="flex flex-1 items-center justify-center">{children}</main>
           <SiteFooter />
         </div>
       </body>
@@ -158,26 +187,38 @@ export default function RootLayout({
 
 function nextHomeTemplate(appName: string, domain: string, envList: string): string {
   return `import { EnvList } from '@/components/env-list';
+import { ContactForm } from '@/components/contact-form';
+
+export const metadata = {
+  title: 'Home',
+  description: 'A minimal starter with routes, metadata, and env var guidance.'
+};
 
 export default function Home() {
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <div className="flex flex-col gap-3">
-        <p className="text-xs uppercase tracking-[0.4em]">Hello World</p>
-        <h1 className="text-3xl font-thin">${escapeTemplate(appName)}</h1>
-        <p className="text-sm">
+      <div className="flex flex-col gap-2">
+        <p className="text-base font-bold uppercase tracking-[0.4em]">Hello World</p>
+        <h1 className="text-base font-bold">${escapeTemplate(appName)}</h1>
+        <p className="text-base">
           ${escapeTemplate(domain) ? `Domain: ${escapeTemplate(domain)}` : 'No domain configured yet.'}
         </p>
       </div>
-      <div className="rounded-xl border border-[var(--fg)] p-6">
-        <h2 className="text-lg font-medium">Environment variables</h2>
-        <p className="text-sm">Set these in your <code className="rounded bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">.env</code>.</p>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-base font-bold">Environment variables</h2>
+        <p className="text-base">
+          Set these in your <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">.env</code>.
+        </p>
         <EnvList />
       </div>
-      <div className="rounded-xl border border-[var(--fg)] p-6">
-        <h2 className="text-lg font-medium">Routes</h2>
-        <p className="text-sm">Explore <code className="rounded bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code> and <code className="rounded bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>.</p>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-base font-bold">Routes</h2>
+        <p className="text-base">
+          Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code> and{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>.
+        </p>
       </div>
+      <ContactForm />
     </section>
   );
 }
@@ -185,11 +226,16 @@ export default function Home() {
 }
 
 function nextRouteTemplate(title: string, body: string): string {
-  return `export default function Page() {
+  return `export const metadata = {
+  title: '${title}',
+  description: '${body}'
+};
+
+export default function Page() {
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-6 py-12">
-      <h1 className="text-3xl font-thin">${title}</h1>
-      <p className="text-sm">${body}</p>
+      <h1 className="text-base font-bold">${title}</h1>
+      <p className="text-base">${body}</p>
     </section>
   );
 }
@@ -207,13 +253,13 @@ const links = [
 
 export function SiteHeader({ appName }: { appName: string }) {
   return (
-    <header className="border-b border-[var(--fg)]">
-      <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+    <header>
+      <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-6">
         <div className="flex items-baseline gap-3">
-          <span className="text-xl font-thin tracking-[0.3em]">ZER0</span>
-          <span className="text-xs uppercase tracking-[0.2em]">{appName}</span>
+          <span className="text-base font-bold tracking-[0.3em]">ZER0</span>
+          <span className="text-base font-bold uppercase tracking-[0.2em]">{appName}</span>
         </div>
-        <nav className="hidden items-center gap-6 text-sm sm:flex">
+        <nav className="hidden items-center gap-6 text-base sm:flex">
           {links.map((link) => (
             <Link key={link.href} href={link.href} className="underline-offset-4 hover:underline">
               {link.label}
@@ -221,8 +267,8 @@ export function SiteHeader({ appName }: { appName: string }) {
           ))}
         </nav>
         <details className="sm:hidden">
-          <summary className="cursor-pointer text-sm">Menu</summary>
-          <div className="mt-3 flex flex-col gap-3 text-sm">
+          <summary className="cursor-pointer text-base font-bold">Menu</summary>
+          <div className="mt-3 flex flex-col gap-3 text-base">
             {links.map((link) => (
               <Link key={link.href} href={link.href} className="underline-offset-4 hover:underline">
                 {link.label}
@@ -244,8 +290,8 @@ function nextFooterTemplate(domain: string): string {
 
   return `export function SiteFooter() {
   return (
-    <footer className=\"border-t border-[var(--fg)]\">
-      <div className=\"mx-auto flex w-full max-w-4xl flex-col gap-2 px-6 py-4 text-xs\">
+    <footer>
+      <div className=\"mx-auto flex w-full max-w-4xl flex-col gap-2 px-6 py-6 text-base\">
         <span>${domainLabel}</span>
         <span>Generated by Aexis Zero.</span>
       </div>
@@ -276,8 +322,181 @@ export function cn(...inputs: ClassValue[]) {
 `;
 }
 
+function nextContactFormTemplate(): string {
+  return `'use client';
+
+import { useState, type ChangeEvent, type FormEvent } from 'react';
+
+type Status = 'idle' | 'sending' | 'sent' | 'error';
+
+type FormState = {
+  name: string;
+  email: string;
+  message: string;
+};
+
+const initialState: FormState = {
+  name: '',
+  email: '',
+  message: ''
+};
+
+export function ContactForm() {
+  const [form, setForm] = useState<FormState>(initialState);
+  const [status, setStatus] = useState<Status>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  const updateField =
+    (key: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm((prev) => ({ ...prev, [key]: event.target.value }));
+    };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
+      setStatus('error');
+      setError('All fields are required.');
+      return;
+    }
+
+    setStatus('sending');
+    setError(null);
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          message: form.message.trim()
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? 'Unable to send message.');
+      }
+
+      setStatus('sent');
+      setForm(initialState);
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Unable to send message.');
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-4 text-base" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-base font-bold">Contact</h2>
+        <p className="text-base">Send a quick note to your inbox.</p>
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-base font-bold">Name</span>
+        <input
+          className="border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
+          value={form.name}
+          onChange={updateField('name')}
+          type="text"
+          autoComplete="name"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-base font-bold">Email</span>
+        <input
+          className="border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
+          value={form.email}
+          onChange={updateField('email')}
+          type="email"
+          autoComplete="email"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-base font-bold">Message</span>
+        <textarea
+          className="min-h-[96px] border-b border-[var(--fg)] bg-transparent py-1 focus:outline-none"
+          value={form.message}
+          onChange={updateField('message')}
+          rows={4}
+        />
+      </label>
+      <button
+        className="self-start text-base font-bold underline underline-offset-4 disabled:opacity-60"
+        type="submit"
+        disabled={status === 'sending'}
+      >
+        {status === 'sending' ? 'Sending...' : 'Send message'}
+      </button>
+      {status === 'sent' ? (
+        <p className="text-base" role="status">
+          Message sent.
+        </p>
+      ) : null}
+      {status === 'error' && error ? (
+        <p className="text-base" role="status">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+`;
+}
+
+function nextContactRouteTemplate(appName: string): string {
+  return `import { Resend } from 'resend';
+
+type Payload = {
+  name: string;
+  email: string;
+  message: string;
+};
+
+function isNonEmpty(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+export async function POST(request: Request) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  const to = process.env.EMAIL_TO?.trim();
+
+  if (!apiKey || !from || !to) {
+    return Response.json(
+      { error: 'Set RESEND_API_KEY, EMAIL_FROM, and EMAIL_TO.' },
+      { status: 500 }
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as Partial<Payload> | null;
+  if (!body || !isNonEmpty(body.name) || !isNonEmpty(body.email) || !isNonEmpty(body.message)) {
+    return Response.json({ error: 'Invalid payload.' }, { status: 400 });
+  }
+
+  const resend = new Resend(apiKey);
+  const name = body.name.trim();
+  const email = body.email.trim();
+  const message = body.message.trim();
+
+  try {
+    await resend.emails.send({
+      from,
+      to,
+      subject: 'New message from ${escapeTemplate(appName)}',
+      text: \`Name: \${name}\\nEmail: \${email}\\n\\n\${message}\`
+    });
+  } catch (error) {
+    return Response.json({ error: 'Failed to send message.' }, { status: 500 });
+  }
+
+  return Response.json({ ok: true });
+}
+`;
+}
+
 function nextGlobalsCss(): string {
-  return `@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap');
+  return `@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -295,16 +514,14 @@ function nextGlobalsCss(): string {
   }
 }
 
-* {
-  border-color: var(--fg);
-}
-
 html,
 body {
   min-height: 100%;
   background: var(--bg);
   color: var(--fg);
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 400;
 }
 
 a {
@@ -316,30 +533,41 @@ a {
 code {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
 `;
 }
 
 function renderNextEnvList(envVars: ModuleEnvVar[]): string {
   if (envVars.length === 0) {
-    return '<p className="text-sm">No environment variables required.</p>';
+    return '<p className="text-base">No environment variables required.</p>';
   }
 
   return envVars
     .map((item) => {
-      return `
-      <div className="rounded-lg border border-[var(--fg)] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="rounded bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">${escapeTemplate(item.key)}</code>
-          <span className="text-sm">${escapeTemplate(item.description)}</span>
-        </div>
+      const link = item.url
+        ? `
         <a
-          className="mt-2 inline-flex text-sm underline underline-offset-4"
+          className="inline-flex text-base underline underline-offset-4"
           href="${escapeAttribute(item.url)}"
           target="_blank"
           rel="noreferrer"
         >
-          Get keys →
-        </a>
+          Get keys ->
+        </a>`
+        : '';
+      return `
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">${escapeTemplate(item.key)}</code>
+          <span className="text-base">${escapeTemplate(item.description)}</span>
+        </div>
+        ${link}
       </div>`;
     })
     .join('\n');
@@ -349,12 +577,12 @@ function expoLayoutTemplate(): string {
   return `import { Stack } from 'expo-router';
 import { TamaguiProvider, Theme } from 'tamagui';
 import { useColorScheme } from 'react-native';
-import { useFonts, GeistMono_100Thin } from '@expo-google-fonts/geist-mono';
+import { useFonts, GeistMono_400Regular, GeistMono_700Bold } from '@expo-google-fonts/geist-mono';
 import config from '../tamagui.config';
 
 export default function RootLayout() {
   const scheme = useColorScheme();
-  const [loaded] = useFonts({ GeistMono_100Thin });
+  const [loaded] = useFonts({ GeistMono_400Regular, GeistMono_700Bold });
 
   if (!loaded) {
     return null;
@@ -372,10 +600,12 @@ export default function RootLayout() {
 }
 
 function expoHomeTemplate(appName: string, domain: string, envItems: string): string {
-  return `import { Text, YStack } from 'tamagui';
+  return `import { Head } from 'expo-router/head';
+import { Text, YStack } from 'tamagui';
 import { PageShell } from '../components/page-shell';
 import { EnvList } from '../components/env-list';
-import { FONT_FAMILY, useThemeColors } from '../components/theme';
+import { ContactForm } from '../components/contact-form';
+import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from '../components/theme';
 
 export default function Home() {
   const { fg } = useThemeColors();
@@ -386,20 +616,28 @@ export default function Home() {
       subtitle="${escapeTemplate(domain) ? `Domain: ${escapeTemplate(domain)}` : 'No domain configured yet.'}"
       badge="Hello World"
     >
-      <YStack borderWidth={1} borderColor={fg} padding="$4" borderRadius="$4" gap="$3">
-        <Text fontFamily={FONT_FAMILY} fontSize="$4" color={fg}>
+      <Head>
+        <title>${escapeTemplate(appName)} | Home</title>
+        <meta name="description" content="A minimal starter with routes, metadata, and env var guidance." />
+        <meta property="og:title" content="${escapeTemplate(appName)}" />
+        <meta property="og:description" content="A minimal starter with routes, metadata, and env var guidance." />
+        <meta property="twitter:card" content="summary_large_image" />
+      </Head>
+      <YStack gap="$3">
+        <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
           Environment variables
         </Text>
         <EnvList />
       </YStack>
-      <YStack borderWidth={1} borderColor={fg} padding="$4" borderRadius="$4" gap="$3">
-        <Text fontFamily={FONT_FAMILY} fontSize="$4" color={fg}>
+      <YStack gap="$2">
+        <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
           Routes
         </Text>
-        <Text fontFamily={FONT_FAMILY} fontSize="$2" color={fg}>
+        <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
           Visit /about and /guide.
         </Text>
       </YStack>
+      <ContactForm />
     </PageShell>
   );
 }
@@ -407,11 +645,19 @@ export default function Home() {
 }
 
 function expoRouteTemplate(title: string, body: string): string {
-  return `import { PageShell } from '../components/page-shell';
+  return `import { Head } from 'expo-router/head';
+import { PageShell } from '../components/page-shell';
 
 export default function Page() {
   return (
     <PageShell title="${title}" subtitle="${body}">
+      <Head>
+        <title>${title}</title>
+        <meta name="description" content="${body}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${body}" />
+        <meta property="twitter:card" content="summary_large_image" />
+      </Head>
       <></>
     </PageShell>
   );
@@ -433,7 +679,9 @@ export const COLORS = {
   }
 };
 
-export const FONT_FAMILY = 'GeistMono_100Thin';
+export const FONT_REGULAR = 'GeistMono_400Regular';
+export const FONT_BOLD = 'GeistMono_700Bold';
+export const FONT_SIZE = 16;
 
 export function useThemeColors() {
   const scheme = useColorScheme();
@@ -451,7 +699,7 @@ function expoHeaderTemplate(appName: string): string {
   return `import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { FONT_FAMILY, useThemeColors } from './theme';
+import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -464,21 +712,25 @@ export function SiteHeader() {
   const { bg, fg } = useThemeColors();
 
   return (
-    <YStack backgroundColor={bg} paddingHorizontal="$5" paddingVertical="$4" borderBottomWidth={1} borderColor={fg}>
+    <YStack backgroundColor={bg} paddingHorizontal="$5" paddingVertical="$4">
       <XStack alignItems="center" justifyContent="space-between">
         <XStack alignItems="center" gap="$3">
-          <Text fontFamily={FONT_FAMILY} fontWeight="100" fontSize="$6" color={fg}>
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} letterSpacing={4} color={fg}>
             ZER0
           </Text>
-          <Text fontFamily={FONT_FAMILY} fontSize="$2" textTransform="uppercase" color={fg}>
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} textTransform="uppercase" color={fg}>
             ${escapeTemplate(appName)}
           </Text>
         </XStack>
         <Button
-          backgroundColor={fg}
-          color={bg}
-          fontFamily={FONT_FAMILY}
-          size="$2"
+          chromeless
+          backgroundColor="transparent"
+          borderWidth={0}
+          color={fg}
+          fontFamily={FONT_BOLD}
+          fontSize={FONT_SIZE}
+          paddingHorizontal={0}
+          paddingVertical={0}
           onPress={() => setOpen((prev) => !prev)}
         >
           Menu
@@ -488,7 +740,7 @@ export function SiteHeader() {
         <YStack marginTop="$3" gap="$2">
           {links.map((link) => (
             <Link key={link.href} href={link.href} asChild>
-              <Text fontFamily={FONT_FAMILY} textDecorationLine="underline" color={fg}>
+              <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} textDecorationLine="underline" color={fg}>
                 {link.label}
               </Text>
             </Link>
@@ -503,17 +755,17 @@ export function SiteHeader() {
 
 function expoFooterTemplate(domain: string): string {
   return `import { Text, YStack } from 'tamagui';
-import { FONT_FAMILY, useThemeColors } from './theme';
+import { FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 
 export function SiteFooter() {
   const { bg, fg } = useThemeColors();
 
   return (
-    <YStack backgroundColor={bg} paddingHorizontal="$5" paddingVertical="$4" borderTopWidth={1} borderColor={fg}>
-      <Text fontFamily={FONT_FAMILY} fontSize="$2" color={fg}>
+    <YStack backgroundColor={bg} paddingHorizontal="$5" paddingVertical="$4">
+      <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
         ${escapeTemplate(domain) ? `Domain: ${escapeTemplate(domain)}` : 'Domain: not set'}
       </Text>
-      <Text fontFamily={FONT_FAMILY} fontSize="$2" color={fg}>
+      <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
         Generated by Aexis Zero.
       </Text>
     </YStack>
@@ -525,7 +777,7 @@ export function SiteFooter() {
 function expoEnvListTemplate(envItems: string): string {
   return `import { Linking } from 'react-native';
 import { Text, YStack } from 'tamagui';
-import { FONT_FAMILY, useThemeColors } from './theme';
+import { FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 
 const envItems = ${envItems};
 
@@ -534,7 +786,7 @@ export function EnvList() {
 
   if (envItems.length === 0) {
     return (
-      <Text fontFamily={FONT_FAMILY} fontSize="$2" color={fg}>
+      <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
         No environment variables required.
       </Text>
     );
@@ -543,30 +795,189 @@ export function EnvList() {
   return (
     <YStack gap="$3">
       {envItems.map((item) => (
-        <YStack key={item.key} borderWidth={1} borderColor={fg} padding="$3" borderRadius="$4">
-          <Text fontFamily={FONT_FAMILY} color={fg}>{item.description}</Text>
+        <YStack key={item.key} gap="$2">
+          <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>{item.description}</Text>
           <Text
-            fontFamily={FONT_FAMILY}
+            fontFamily={FONT_REGULAR}
+            fontSize={FONT_SIZE}
             backgroundColor={fg}
             color={bg}
             paddingHorizontal="$2"
             paddingVertical="$1"
-            borderRadius="$2"
-            marginTop="$2"
           >
             {item.key}
           </Text>
-          <Text
-            fontFamily={FONT_FAMILY}
-            textDecorationLine="underline"
-            color={fg}
-            marginTop="$2"
-            onPress={() => Linking.openURL(item.url)}
-          >
-            Get keys →
-          </Text>
+          {item.url ? (
+            <Text
+              fontFamily={FONT_REGULAR}
+              fontSize={FONT_SIZE}
+              textDecorationLine="underline"
+              color={fg}
+              onPress={() => Linking.openURL(item.url)}
+            >
+              Get keys ->
+            </Text>
+          ) : null}
         </YStack>
       ))}
+    </YStack>
+  );
+}
+`;
+}
+
+function expoContactFormTemplate(): string {
+  return `import { useState } from 'react';
+import { Linking, TextInput } from 'react-native';
+import { Button, Text, YStack } from 'tamagui';
+import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
+
+const CONTACT_EMAIL = process.env.EXPO_PUBLIC_CONTACT_EMAIL?.trim() ?? '';
+const CONTACT_ENDPOINT = process.env.EXPO_PUBLIC_CONTACT_ENDPOINT?.trim() ?? '';
+
+type Status = 'idle' | 'sending' | 'sent' | 'error';
+
+export function ContactForm() {
+  const { fg } = useThemeColors();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<Status>('idle');
+  const [error, setError] = useState('');
+
+  const inputStyle = {
+    borderBottomWidth: 1,
+    borderBottomColor: fg,
+    paddingVertical: 6,
+    fontFamily: FONT_REGULAR,
+    fontSize: FONT_SIZE,
+    color: fg
+  };
+
+  const submit = async () => {
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setStatus('error');
+      setError('All fields are required.');
+      return;
+    }
+
+    setStatus('sending');
+    setError('');
+
+    let sent = false;
+    if (CONTACT_ENDPOINT) {
+      try {
+        const response = await fetch(CONTACT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            message: message.trim()
+          })
+        });
+        sent = response.ok;
+      } catch {
+        sent = false;
+      }
+    }
+
+    if (!sent && CONTACT_EMAIL) {
+      const subject = encodeURIComponent(\`New message from \${name.trim()}\`);
+      const body = encodeURIComponent(\`Name: \${name.trim()}\\nEmail: \${email.trim()}\\n\\n\${message.trim()}\`);
+      const url = \`mailto:\${CONTACT_EMAIL}?subject=\${subject}&body=\${body}\`;
+      try {
+        await Linking.openURL(url);
+        sent = true;
+      } catch {
+        sent = false;
+      }
+    }
+
+    if (!sent) {
+      setStatus('error');
+      if (CONTACT_ENDPOINT || CONTACT_EMAIL) {
+        setError('Unable to send message.');
+      } else {
+        setError('Set EXPO_PUBLIC_CONTACT_ENDPOINT or EXPO_PUBLIC_CONTACT_EMAIL.');
+      }
+      return;
+    }
+
+    setStatus('sent');
+    setName('');
+    setEmail('');
+    setMessage('');
+  };
+
+  return (
+    <YStack gap=\"$3\">
+      <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
+        Contact
+      </Text>
+      <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
+        Send a quick note to your inbox.
+      </Text>
+      <YStack gap=\"$3\">
+        <YStack gap=\"$1\">
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
+            Name
+          </Text>
+          <TextInput
+            style={inputStyle}
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            autoComplete="name"
+          />
+        </YStack>
+        <YStack gap=\"$1\">
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
+            Email
+          </Text>
+          <TextInput
+            style={inputStyle}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+          />
+        </YStack>
+        <YStack gap=\"$1\">
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
+            Message
+          </Text>
+          <TextInput
+            style={{ ...inputStyle, minHeight: 96, textAlignVertical: 'top' }}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+        </YStack>
+      </YStack>
+      <Button
+        backgroundColor=\"transparent\"
+        borderWidth={0}
+        paddingHorizontal={0}
+        paddingVertical={0}
+        alignSelf=\"flex-start\"
+        onPress={submit}
+      >
+        <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg} textDecorationLine=\"underline\">
+          {status === 'sending' ? 'Sending...' : 'Send message'}
+        </Text>
+      </Button>
+      {status === 'sent' ? (
+        <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
+          Message sent.
+        </Text>
+      ) : null}
+      {status === 'error' && error ? (
+        <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
+          {error}
+        </Text>
+      ) : null}
     </YStack>
   );
 }
@@ -578,7 +989,7 @@ function expoPageShellTemplate(): string {
 import { ScrollView, Text, YStack } from 'tamagui';
 import { SiteHeader } from './site-header';
 import { SiteFooter } from './site-footer';
-import { FONT_FAMILY, useThemeColors } from './theme';
+import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 
 interface PageShellProps {
   title: string;
@@ -593,17 +1004,17 @@ export function PageShell({ title, subtitle, badge, children }: PageShellProps) 
   return (
     <YStack flex={1} backgroundColor={bg}>
       <SiteHeader />
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
+      <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }}>
         <YStack gap="$4">
           {badge ? (
-            <Text fontFamily={FONT_FAMILY} fontSize="$2" textTransform="uppercase" letterSpacing={2} color={fg}>
+            <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} textTransform="uppercase" letterSpacing={2} color={fg}>
               {badge}
             </Text>
           ) : null}
-          <Text fontFamily={FONT_FAMILY} fontSize="$7" color={fg}>
+          <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
             {title}
           </Text>
-          <Text fontFamily={FONT_FAMILY} fontSize="$3" color={fg}>
+          <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
             {subtitle}
           </Text>
           {children}
@@ -662,10 +1073,11 @@ function renderExpoEnvItems(envVars: ModuleEnvVar[]): string {
     return '[]';
   }
   const items = envVars.map((item) => {
+    const url = item.url ? `'${escapeTemplate(item.url)}'` : 'undefined';
     return `{
       key: '${escapeTemplate(item.key)}',
       description: '${escapeTemplate(item.description)}',
-      url: '${escapeTemplate(item.url)}'
+      url: ${url}
     }`;
   });
   return `[

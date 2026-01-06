@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runWizard } from './cli/prompts.js';
+import { runWizard } from './cli/bubbletea.js';
 import { assertBunAvailable } from './env/detect.js';
 import { scaffoldProject } from './engine/scaffold.js';
 import type { ProjectConfig } from './types.js';

@@ -3,9 +3,11 @@ import { promises as fs } from 'fs';
 import { execa } from 'execa';
 import type { ProjectConfig } from '../types.js';
 import { getFrameworkDefinition } from '../config/frameworks.js';
-import { getModuleEnvHelp } from '../config/modules.js';
+import { getBaseEnvHelp } from '../config/base-env.js';
+import { getModuleEnvHelp, type ModuleEnvVar } from '../config/modules.js';
 import { installBaseDependencies, installModulePackages } from './installers.js';
 import { writeEnvExample } from './env.js';
+import { assertAssetSources, generateExpoAssets, generateNextAssets, resolveAssetSources } from './assets.js';
 import {
   buildNextTemplateFiles,
   buildExpoTemplateFiles,
@@ -23,6 +25,8 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
   await ensureEmptyTargetDir(targetDir);
 
   const framework = getFrameworkDefinition(config.framework);
+  const sources = resolveAssetSources();
+  await assertAssetSources(sources);
 
   console.log(`Scaffolding ${framework.label}...`);
   await runScaffoldCommand(
@@ -39,6 +43,23 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
     await applyExpoTemplates(config, targetDir);
   }
 
+  console.log('Generating brand assets...');
+  if (config.framework === 'nextjs') {
+    const usesSrcDir = await pathExists(path.join(targetDir, 'src', 'app'));
+    const appDir = usesSrcDir ? path.join(targetDir, 'src', 'app') : path.join(targetDir, 'app');
+    await generateNextAssets(sources, {
+      appDir,
+      publicDir: path.join(targetDir, 'public'),
+      assetsDir: path.join(targetDir, 'assets')
+    });
+  } else {
+    await generateExpoAssets(sources, {
+      appDir: path.join(targetDir, 'app'),
+      publicDir: path.join(targetDir, 'public'),
+      assetsDir: path.join(targetDir, 'assets')
+    });
+  }
+
   console.log('Installing base dependencies with Bun...');
   await installBaseDependencies(targetDir, framework.packages);
 
@@ -46,7 +67,7 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
   await installModulePackages(config.framework, config.modules, targetDir);
 
   console.log('Generating .env.example...');
-  await writeEnvExample(config.modules, targetDir);
+  await writeEnvExample(config.modules, config.framework, targetDir);
 
   console.log('Scaffold complete.');
   const cdTarget = directoryInput === '.' ? '.' : directoryInput.includes(' ') ? `"${directoryInput}"` : directoryInput;
@@ -103,7 +124,7 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
   const srcAppDir = path.join(targetDir, 'src', 'app');
   const usesSrcDir = await pathExists(srcAppDir);
   const basePath = usesSrcDir ? 'src' : '';
-  const envHelp = getModuleEnvHelp(config.modules);
+  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
 
   const files = buildNextTemplateFiles({
     appName: config.appName,
@@ -124,7 +145,7 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
 }
 
 async function applyExpoTemplates(config: ProjectConfig, targetDir: string): Promise<void> {
-  const envHelp = getModuleEnvHelp(config.modules);
+  const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
   const files = buildExpoTemplateFiles({
     appName: config.appName,
     domain: config.domain,
@@ -146,6 +167,12 @@ async function ensureExpoConfig(targetDir: string, appName: string): Promise<voi
 
   appJson.expo.name = appName;
   appJson.expo.slug = toSlug(appName);
+  appJson.expo.icon = './assets/icon.png';
+  appJson.expo.splash = {
+    image: './assets/splash.png',
+    resizeMode: 'contain',
+    backgroundColor: '#E7E5E4'
+  };
 
   if (!Array.isArray(appJson.expo.platforms)) {
     appJson.expo.platforms = ['ios', 'android', 'macos', 'windows'];
@@ -159,6 +186,28 @@ async function ensureExpoConfig(targetDir: string, appName: string): Promise<voi
   } else {
     const current = appJson.expo.plugins.filter((value: unknown) => typeof value === 'string');
     appJson.expo.plugins = mergeUnique(current, ['expo-router']);
+  }
+
+  if (!appJson.expo.android || typeof appJson.expo.android !== 'object') {
+    appJson.expo.android = {};
+  }
+  appJson.expo.android.adaptiveIcon = {
+    foregroundImage: './assets/adaptive-icon.png',
+    backgroundColor: '#E7E5E4'
+  };
+
+  if (!appJson.expo.ios || typeof appJson.expo.ios !== 'object') {
+    appJson.expo.ios = {};
+  }
+  appJson.expo.ios.icon = './assets/icon.png';
+
+  if (!appJson.expo.web || typeof appJson.expo.web !== 'object') {
+    appJson.expo.web = {};
+  }
+  appJson.expo.web.favicon = './assets/favicon.png';
+
+  if (!Array.isArray(appJson.expo.assetBundlePatterns)) {
+    appJson.expo.assetBundlePatterns = ['**/*'];
   }
 
   await writeJson(appJsonPath, appJson);
@@ -199,6 +248,18 @@ async function ensureNextTurbo(targetDir: string): Promise<void> {
     packageJson.scripts.dev = `${currentDev} --turbo`;
   }
   await writeJson(packageJsonPath, packageJson);
+}
+
+function mergeEnvHelp(...lists: ModuleEnvVar[][]): ModuleEnvVar[] {
+  const map = new Map<string, ModuleEnvVar>();
+  for (const list of lists) {
+    for (const item of list) {
+      if (!map.has(item.key)) {
+        map.set(item.key, item);
+      }
+    }
+  }
+  return Array.from(map.values());
 }
 
 async function ensurePackageName(targetDir: string, appName: string): Promise<void> {

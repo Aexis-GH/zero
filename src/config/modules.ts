@@ -3,7 +3,7 @@ import type { FrameworkId, ModuleId } from '../types.js';
 export interface ModuleEnvVar {
   key: string;
   description: string;
-  url: string;
+  url?: string;
 }
 
 export interface ModuleDefinition {
