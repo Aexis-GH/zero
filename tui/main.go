@@ -22,11 +22,14 @@ const (
 	stepFramework
 	stepModules
 	stepConfirm
+	stepPackageManager
 )
 
 type framework string
 
 type module string
+
+type packageManager string
 
 const (
 	frameworkNext framework = "nextjs"
@@ -36,6 +39,8 @@ const (
 var moduleOptions = []module{"neon", "clerk", "payload", "stripe"}
 
 var frameworkOptions = []framework{frameworkNext, frameworkExpo}
+
+var packageManagerOptions = []packageManager{"npm", "pnpm", "yarn", "bun"}
 
 const (
 	colorLight = "#E7E5E4"
@@ -48,6 +53,7 @@ type config struct {
 	Domain    string   `json:"domain"`
 	Framework string   `json:"framework"`
 	Modules   []string `json:"modules"`
+	Package   string   `json:"packageManager"`
 }
 
 type model struct {
@@ -59,6 +65,7 @@ type model struct {
 	moduleIdx    int
 	selected     map[module]bool
 	confirmIdx   int
+	pkgIdx       int
 	err          string
 	result       *config
 	cancelled    bool
@@ -176,14 +183,8 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	case stepConfirm:
 		switch m.confirmIdx {
 		case 0:
-			m.result = &config{
-				Directory: strings.TrimSpace(m.directory.Value()),
-				AppName:   strings.TrimSpace(m.name.Value()),
-				Domain:    strings.TrimSpace(m.domain.Value()),
-				Framework: string(frameworkOptions[m.frameworkIdx]),
-				Modules:   m.selectedModules(),
-			}
-			return m, tea.Quit
+			m.step = stepPackageManager
+			return m, nil
 		case 1:
 			m.step = stepDirectory
 			m.directory.Focus()
@@ -201,6 +202,16 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.cancelled = true
 			return m, tea.Quit
 		}
+	case stepPackageManager:
+		m.result = &config{
+			Directory: strings.TrimSpace(m.directory.Value()),
+			AppName:   strings.TrimSpace(m.name.Value()),
+			Domain:    strings.TrimSpace(m.domain.Value()),
+			Framework: string(frameworkOptions[m.frameworkIdx]),
+			Modules:   m.selectedModules(),
+			Package:   string(packageManagerOptions[m.pkgIdx]),
+		}
+		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -219,6 +230,10 @@ func (m model) handleUp() (tea.Model, tea.Cmd) {
 		if m.confirmIdx > 0 {
 			m.confirmIdx--
 		}
+	case stepPackageManager:
+		if m.pkgIdx > 0 {
+			m.pkgIdx--
+		}
 	}
 	return m, nil
 }
@@ -236,6 +251,10 @@ func (m model) handleDown() (tea.Model, tea.Cmd) {
 	case stepConfirm:
 		if m.confirmIdx < 6 {
 			m.confirmIdx++
+		}
+	case stepPackageManager:
+		if m.pkgIdx < len(packageManagerOptions)-1 {
+			m.pkgIdx++
 		}
 	}
 	return m, nil
@@ -289,6 +308,8 @@ func (m model) View() string {
 		}
 		content += muted.Render(fmt.Sprintf("Modules: %s", modulesLabel)) + "\n\n"
 		content += renderConfirm(m.confirmIdx)
+	case stepPackageManager:
+		content += base.Render("Package manager") + "\n" + renderPackageManagerOptions(m.pkgIdx)
 	}
 
 	footer := muted.Render("↑/↓ move • space toggle • enter confirm • esc cancel")
@@ -344,6 +365,19 @@ func renderConfirm(active int) string {
 		lines = append(lines, fmt.Sprintf("%s ( ) %s", cursor, action))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func renderPackageManagerOptions(active int) string {
+	labels := []string{"npm", "pnpm", "yarn", "bun"}
+	lines := make([]string, 0, len(labels))
+	for i, label := range labels {
+		cursor := " "
+		if i == active {
+			cursor = ">"
+		}
+		lines = append(lines, fmt.Sprintf("%s ( ) %s", cursor, label))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func (m model) selectedModules() []string {

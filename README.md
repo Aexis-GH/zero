@@ -22,7 +22,7 @@ zero
 
 ## Requirements
 
-- Bun installed and available on PATH.
+- One package manager installed: npm, pnpm, yarn, or bun.
 
 ## Generated starters
 

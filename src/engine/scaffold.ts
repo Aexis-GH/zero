@@ -13,6 +13,7 @@ import {
   buildExpoTemplateFiles,
   componentsJsonTemplate
 } from './templates.js';
+import { getPackageManagerDefinition } from '../config/package-managers.js';
 
 const baseEnv = {
   ...process.env,
@@ -25,15 +26,17 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
   await ensureEmptyTargetDir(targetDir);
 
   const framework = getFrameworkDefinition(config.framework);
+  const packageManager = getPackageManagerDefinition(config.packageManager);
   const sources = resolveAssetSources();
   await assertAssetSources(sources);
 
   console.log(`Scaffolding ${framework.label}...`);
+  const argSets = buildScaffoldArgs(framework, config.packageManager);
   await runScaffoldCommand(
-    framework.scaffold.command,
+    packageManager.runner,
     framework.scaffold.packageName,
     directoryInput,
-    framework.scaffold.argSets
+    argSets
   );
 
   console.log('Applying framework templates...');
@@ -60,18 +63,19 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
     });
   }
 
-  console.log('Installing base dependencies with Bun...');
-  await installBaseDependencies(targetDir, framework.packages);
+  console.log(`Installing base dependencies with ${packageManager.label}...`);
+  await installBaseDependencies(targetDir, config.packageManager, framework.packages);
 
   console.log('Installing module packages...');
-  await installModulePackages(config.framework, config.modules, targetDir);
+  await installModulePackages(config.framework, config.modules, targetDir, config.packageManager);
 
   console.log('Generating .env.example...');
   await writeEnvExample(config.modules, config.framework, targetDir);
 
   console.log('Scaffold complete.');
   const cdTarget = directoryInput === '.' ? '.' : directoryInput.includes(' ') ? `"${directoryInput}"` : directoryInput;
-  console.log(`\nNext steps:\n  1) cd ${cdTarget}\n  2) bun run dev`);
+  const devCommand = packageManager.dev.join(' ');
+  console.log(`\nNext steps:\n  1) cd ${cdTarget}\n  2) ${devCommand}`);
 }
 
 async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
@@ -95,7 +99,7 @@ async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
 }
 
 async function runScaffoldCommand(
-  command: string,
+  runner: { command: string; args: string[] },
   packageName: string,
   directoryInput: string,
   argSets: string[][]
@@ -104,7 +108,7 @@ async function runScaffoldCommand(
   const targetArg = directoryInput === '.' ? '.' : directoryInput;
   for (const args of argSets) {
     try {
-      await execa(command, [packageName, targetArg, ...args], {
+      await execa(runner.command, [...runner.args, packageName, targetArg, ...args], {
         stdio: 'inherit',
         env: baseEnv,
         shell: false
@@ -118,6 +122,36 @@ async function runScaffoldCommand(
     ? `Scaffold failed after ${errors.length} attempts:\n${errors.join('\n')}`
     : 'Scaffold failed for unknown reasons.';
   throw new Error(message);
+}
+
+function buildScaffoldArgs(
+  framework: { id: string; scaffold: { argSets: string[][] } },
+  packageManager: string
+): string[][] {
+  if (framework.id !== 'nextjs') {
+    return framework.scaffold.argSets;
+  }
+  const flag = resolveNextPackageManagerFlag(packageManager);
+  if (!flag) {
+    return framework.scaffold.argSets;
+  }
+  const withFlag = framework.scaffold.argSets.map((args) => [...args, flag]);
+  return [...withFlag, ...framework.scaffold.argSets];
+}
+
+function resolveNextPackageManagerFlag(packageManager: string): string | null {
+  switch (packageManager) {
+    case 'npm':
+      return '--use-npm';
+    case 'pnpm':
+      return '--use-pnpm';
+    case 'yarn':
+      return '--use-yarn';
+    case 'bun':
+      return '--use-bun';
+    default:
+      return null;
+  }
 }
 
 async function applyNextTemplates(config: ProjectConfig, targetDir: string): Promise<void> {

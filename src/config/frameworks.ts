@@ -6,7 +6,6 @@ export interface FrameworkDefinition {
   description: string;
   packages: string[];
   scaffold: {
-    command: string;
     packageName: string;
     argSets: string[][];
   };
@@ -27,7 +26,6 @@ export const frameworks: FrameworkDefinition[] = [
       '@radix-ui/react-slot'
     ],
     scaffold: {
-      command: 'bunx',
       packageName: 'create-next-app@latest',
       argSets: [
         [
@@ -39,7 +37,6 @@ export const frameworks: FrameworkDefinition[] = [
           '--no-src-dir',
           '--import-alias',
           '@/*',
-          '--use-bun',
           '--skip-install'
         ],
         [
@@ -51,7 +48,6 @@ export const frameworks: FrameworkDefinition[] = [
           '--no-src-dir',
           '--import-alias',
           '@/*',
-          '--use-bun'
         ],
         [
           '--ts',
@@ -91,7 +87,6 @@ export const frameworks: FrameworkDefinition[] = [
       'react-native-svg'
     ],
     scaffold: {
-      command: 'bunx',
       packageName: 'create-expo-app',
       argSets: [
         ['--template', 'expo-router', '--yes', '--no-install'],
