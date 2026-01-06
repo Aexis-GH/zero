@@ -261,11 +261,16 @@ func (m model) handleDown() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleSpace() (tea.Model, tea.Cmd) {
-	if m.step == stepModules {
+	switch m.step {
+	case stepModules:
 		selected := moduleOptions[m.moduleIdx]
 		m.selected[selected] = !m.selected[selected]
+		return m, nil
+	case stepFramework, stepConfirm, stepPackageManager:
+		return m.handleEnter()
+	default:
+		return m, nil
 	}
-	return m, nil
 }
 
 func (m model) View() string {
@@ -324,7 +329,11 @@ func renderFrameworkOptions(active int) string {
 		if i == active {
 			cursor = ">"
 		}
-		lines = append(lines, fmt.Sprintf("%s ( ) %s", cursor, label))
+		mark := "( )"
+		if i == active {
+			mark = "(•)"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, label))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -362,7 +371,11 @@ func renderConfirm(active int) string {
 		if i == active {
 			cursor = ">"
 		}
-		lines = append(lines, fmt.Sprintf("%s ( ) %s", cursor, action))
+		mark := "( )"
+		if i == active {
+			mark = "(•)"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, action))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -375,7 +388,11 @@ func renderPackageManagerOptions(active int) string {
 		if i == active {
 			cursor = ">"
 		}
-		lines = append(lines, fmt.Sprintf("%s ( ) %s", cursor, label))
+		mark := "( )"
+		if i == active {
+			mark = "(•)"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, label))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
