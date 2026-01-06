@@ -23,8 +23,8 @@ export interface ModuleDefinition {
 export const modules: ModuleDefinition[] = [
   {
     id: 'neon',
-    label: 'Database (Neon)',
-    description: 'Serverless Postgres with Neon.',
+    label: 'DB',
+    description: 'Serverless Postgres via Neon.',
     connect: {
       label: 'Connect to Neon',
       url: 'https://console.neon.tech/'
@@ -43,8 +43,8 @@ export const modules: ModuleDefinition[] = [
   },
   {
     id: 'clerk',
-    label: 'Auth (Clerk)',
-    description: 'Authentication with Clerk.',
+    label: 'Auth',
+    description: 'Authentication via Clerk.',
     connect: {
       label: 'Connect to Clerk',
       url: 'https://dashboard.clerk.com'
@@ -68,8 +68,8 @@ export const modules: ModuleDefinition[] = [
   },
   {
     id: 'payload',
-    label: 'CMS (Payload)',
-    description: 'Headless CMS using Payload.',
+    label: 'CMS',
+    description: 'Headless CMS via Payload.',
     connect: {
       label: 'Generate Payload Secret',
       url: 'https://payloadcms.com/docs'
@@ -93,8 +93,8 @@ export const modules: ModuleDefinition[] = [
   },
   {
     id: 'stripe',
-    label: 'Payments (Stripe)',
-    description: 'Payments via Stripe SDK.',
+    label: 'Payments',
+    description: 'Payments via Stripe.',
     connect: {
       label: 'Connect to Stripe',
       url: 'https://dashboard.stripe.com/apikeys'
