@@ -60,7 +60,9 @@ async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
       throw new Error('Target path exists and is not a directory.');
     }
     const entries = await fs.readdir(targetDir);
-    if (entries.length > 0) {
+    const allowed = new Set(['.git', '.gitignore', '.gitkeep']);
+    const remaining = entries.filter((entry) => !allowed.has(entry));
+    if (remaining.length > 0) {
       throw new Error('Target directory is not empty.');
     }
   } catch (error) {

@@ -147,7 +147,7 @@ export default function RootLayout({
         <div className="flex min-h-screen flex-col">
           <SiteHeader appName="${escapeTemplate(appName)}" />
           <main className="flex-1">{children}</main>
-          <SiteFooter domain="${escapeTemplate(domain)}" />
+          <SiteFooter />
         </div>
       </body>
     </html>
@@ -242,7 +242,7 @@ function nextFooterTemplate(domain: string): string {
     ? `Domain: ${escapeTemplate(domain)}`
     : 'Domain: not set';
 
-  return `export function SiteFooter({ domain }: { domain?: string }) {
+  return `export function SiteFooter() {
   return (
     <footer className=\"border-t border-[var(--fg)]\">
       <div className=\"mx-auto flex w-full max-w-4xl flex-col gap-2 px-6 py-4 text-xs\">
