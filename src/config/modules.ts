@@ -6,10 +6,16 @@ export interface ModuleEnvVar {
   url?: string;
 }
 
+export interface ModuleConnection {
+  label: string;
+  url: string;
+}
+
 export interface ModuleDefinition {
   id: ModuleId;
   label: string;
   description: string;
+  connect?: ModuleConnection;
   envVars: ModuleEnvVar[];
   packages: Record<FrameworkId, string[]>;
 }
@@ -19,6 +25,10 @@ export const modules: ModuleDefinition[] = [
     id: 'neon',
     label: 'Database (Neon)',
     description: 'Serverless Postgres with Neon.',
+    connect: {
+      label: 'Connect to Neon',
+      url: 'https://console.neon.tech/'
+    },
     envVars: [
       {
         key: 'DATABASE_URL',
@@ -35,6 +45,10 @@ export const modules: ModuleDefinition[] = [
     id: 'clerk',
     label: 'Auth (Clerk)',
     description: 'Authentication with Clerk.',
+    connect: {
+      label: 'Connect to Clerk',
+      url: 'https://dashboard.clerk.com'
+    },
     envVars: [
       {
         key: 'CLERK_PUBLISHABLE_KEY',
@@ -56,6 +70,10 @@ export const modules: ModuleDefinition[] = [
     id: 'payload',
     label: 'CMS (Payload)',
     description: 'Headless CMS using Payload.',
+    connect: {
+      label: 'Generate Payload Secret',
+      url: 'https://payloadcms.com/docs'
+    },
     envVars: [
       {
         key: 'PAYLOAD_SECRET',
@@ -77,6 +95,10 @@ export const modules: ModuleDefinition[] = [
     id: 'stripe',
     label: 'Payments (Stripe)',
     description: 'Payments via Stripe SDK.',
+    connect: {
+      label: 'Connect to Stripe',
+      url: 'https://dashboard.stripe.com/apikeys'
+    },
     envVars: [
       {
         key: 'STRIPE_SECRET_KEY',
@@ -137,4 +159,23 @@ export function getModuleEnvHelp(moduleIds: ModuleId[]): ModuleEnvVar[] {
     }
   }
   return Array.from(map.values());
+}
+
+export function getModuleConnections(moduleIds: ModuleId[]): ModuleConnection[] {
+  const connections: ModuleConnection[] = [];
+  for (const id of moduleIds) {
+    const module = getModuleDefinition(id);
+    if (module.connect) {
+      connections.push(module.connect);
+      continue;
+    }
+    const fallback = module.envVars.find((item) => item.url);
+    if (fallback?.url) {
+      connections.push({
+        label: `Connect to ${module.label}`,
+        url: fallback.url
+      });
+    }
+  }
+  return connections;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@aex.is/zero",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Aexis Zero scaffolding CLI",
   "license": "UNLICENSED",
   "type": "module",

@@ -8,23 +8,19 @@ const nextBaseEnv: ModuleEnvVar[] = [
     url: 'https://resend.com'
   },
   {
-    key: 'EMAIL_FROM',
+    key: 'CONTACT_FROM_EMAIL',
     description: 'Verified sender email address'
   },
   {
-    key: 'EMAIL_TO',
+    key: 'CONTACT_TO_EMAIL',
     description: 'Destination email address'
   }
 ];
 
 const expoBaseEnv: ModuleEnvVar[] = [
   {
-    key: 'EXPO_PUBLIC_CONTACT_EMAIL',
-    description: 'Email address used for contact form'
-  },
-  {
     key: 'EXPO_PUBLIC_CONTACT_ENDPOINT',
-    description: 'Optional contact API endpoint'
+    description: 'Contact API endpoint (e.g. https://yourdomain.com/api/contact)'
   }
 ];
 

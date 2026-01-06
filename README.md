@@ -28,14 +28,14 @@ zero
 
 - Next.js App Router + Tailwind + shadcn-ready config.
 - Expo Router + Tamagui.
-- Minimal layout, three routes, metadata, and icon generation.
-- Contact form wired to `/api/contact` (Next) and mailto/endpoint fallback (Expo).
+- Minimal layout, four routes, metadata, and icon generation.
+- Contact form wired to `/api/contact` (Next) and a device POST to your backend (Expo).
 
 ## Environment variables
 
 The CLI generates `.env.example` with:
-- Next.js: `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TO`.
-- Expo: `EXPO_PUBLIC_CONTACT_EMAIL`, `EXPO_PUBLIC_CONTACT_ENDPOINT`.
+- Next.js: `RESEND_API_KEY`, `CONTACT_FROM_EMAIL`, `CONTACT_TO_EMAIL`.
+- Expo: `EXPO_PUBLIC_CONTACT_ENDPOINT`.
 - Any selected module keys (Neon, Clerk, Payload, Stripe).
 
 ## Development

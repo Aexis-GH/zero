@@ -4,7 +4,11 @@ import { execa } from 'execa';
 import type { ProjectConfig } from '../types.js';
 import { getFrameworkDefinition } from '../config/frameworks.js';
 import { getBaseEnvHelp } from '../config/base-env.js';
-import { getModuleEnvHelp, type ModuleEnvVar } from '../config/modules.js';
+import {
+  getModuleConnections,
+  getModuleEnvHelp,
+  type ModuleEnvVar
+} from '../config/modules.js';
 import { installBaseDependencies, installModulePackages } from './installers.js';
 import { writeEnvExample } from './env.js';
 import { assertAssetSources, generateExpoAssets, generateNextAssets, resolveAssetSources } from './assets.js';
@@ -159,11 +163,13 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
   const usesSrcDir = await pathExists(srcAppDir);
   const basePath = usesSrcDir ? 'src' : '';
   const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
+  const connections = getModuleConnections(config.modules);
 
   const files = buildNextTemplateFiles({
     appName: config.appName,
     domain: config.domain,
     envVars: envHelp,
+    connections,
     basePath
   });
 
@@ -180,10 +186,12 @@ async function applyNextTemplates(config: ProjectConfig, targetDir: string): Pro
 
 async function applyExpoTemplates(config: ProjectConfig, targetDir: string): Promise<void> {
   const envHelp = mergeEnvHelp(getBaseEnvHelp(config.framework), getModuleEnvHelp(config.modules));
+  const connections = getModuleConnections(config.modules);
   const files = buildExpoTemplateFiles({
     appName: config.appName,
     domain: config.domain,
     envVars: envHelp,
+    connections,
     basePath: ''
   });
 

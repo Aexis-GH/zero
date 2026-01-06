@@ -1,9 +1,10 @@
-import type { ModuleEnvVar } from '../config/modules.js';
+import type { ModuleConnection, ModuleEnvVar } from '../config/modules.js';
 
 interface TemplateData {
   appName: string;
   domain: string;
   envVars: ModuleEnvVar[];
+  connections: ModuleConnection[];
   basePath: string;
 }
 
@@ -30,6 +31,7 @@ export function componentsJsonTemplate(globalsPath: string, tailwindConfigPath: 
 export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string; content: string }> {
   const base = data.basePath ? `${data.basePath}/` : '';
   const envList = renderNextEnvList(data.envVars);
+  const connectionSection = renderNextConnectionSection(data.connections);
 
   return [
     {
@@ -38,7 +40,7 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
     },
     {
       path: `${base}app/page.tsx`,
-      content: nextHomeTemplate(data.appName, data.domain, envList)
+      content: nextHomeTemplate(data.appName, data.domain, envList, connectionSection)
     },
     {
       path: `${base}app/about/page.tsx`,
@@ -47,6 +49,10 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
     {
       path: `${base}app/guide/page.tsx`,
       content: nextRouteTemplate('Guide', 'Three routes are ready. Customize and ship.')
+    },
+    {
+      path: `${base}app/contact/page.tsx`,
+      content: nextContactPageTemplate()
     },
     {
       path: `${base}app/api/contact/route.ts`,
@@ -69,6 +75,10 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
       content: nextContactFormTemplate()
     },
     {
+      path: `${base}components/connection-guide.tsx`,
+      content: nextConnectionGuideTemplate(data.connections)
+    },
+    {
       path: `${base}components/env-list.tsx`,
       content: nextEnvListTemplate(envList)
     },
@@ -81,6 +91,7 @@ export function buildNextTemplateFiles(data: TemplateData): Array<{ path: string
 
 export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string; content: string }> {
   const envItems = renderExpoEnvItems(data.envVars);
+  const connectionItems = renderConnectionItems(data.connections);
   return [
     {
       path: 'app/_layout.tsx',
@@ -89,6 +100,10 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
     {
       path: 'app/index.tsx',
       content: expoHomeTemplate(data.appName, data.domain, envItems)
+    },
+    {
+      path: 'app/contact.tsx',
+      content: expoContactTemplate()
     },
     {
       path: 'app/about.tsx',
@@ -113,6 +128,10 @@ export function buildExpoTemplateFiles(data: TemplateData): Array<{ path: string
     {
       path: 'components/env-list.tsx',
       content: expoEnvListTemplate(envItems)
+    },
+    {
+      path: 'components/connection-guide.tsx',
+      content: expoConnectionGuideTemplate(connectionItems)
     },
     {
       path: 'components/contact-form.tsx',
@@ -185,9 +204,10 @@ export default function RootLayout({
 `;
 }
 
-function nextHomeTemplate(appName: string, domain: string, envList: string): string {
+function nextHomeTemplate(appName: string, domain: string, envList: string, connectionSection: string): string {
   return `import { EnvList } from '@/components/env-list';
 import { ContactForm } from '@/components/contact-form';
+import { ConnectionGuide } from '@/components/connection-guide';
 
 export const metadata = {
   title: 'Home',
@@ -211,11 +231,13 @@ export default function Home() {
         </p>
         <EnvList />
       </div>
+      ${connectionSection}
       <div className="flex flex-col gap-2">
         <h2 className="text-base font-bold">Routes</h2>
         <p className="text-base">
-          Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code> and{' '}
-          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>.
+          Explore <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/about</code>,{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/guide</code>, and{' '}
+          <code className="bg-[var(--fg)] px-2 py-1 text-[var(--bg)]">/contact</code>.
         </p>
       </div>
       <ContactForm />
@@ -248,7 +270,8 @@ function nextHeaderTemplate(appName: string): string {
 const links = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/guide', label: 'Guide' }
+  { href: '/guide', label: 'Guide' },
+  { href: '/contact', label: 'Contact' }
 ];
 
 export function SiteHeader({ appName }: { appName: string }) {
@@ -459,12 +482,12 @@ function isNonEmpty(value: unknown): value is string {
 
 export async function POST(request: Request) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim();
-  const to = process.env.EMAIL_TO?.trim();
+  const from = process.env.CONTACT_FROM_EMAIL?.trim();
+  const to = process.env.CONTACT_TO_EMAIL?.trim();
 
   if (!apiKey || !from || !to) {
     return Response.json(
-      { error: 'Set RESEND_API_KEY, EMAIL_FROM, and EMAIL_TO.' },
+      { error: 'Set RESEND_API_KEY, CONTACT_FROM_EMAIL, and CONTACT_TO_EMAIL.' },
       { status: 500 }
     );
   }
@@ -491,6 +514,26 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ ok: true });
+}
+`;
+}
+
+function nextContactPageTemplate(): string {
+  return `import { ContactForm } from '@/components/contact-form';
+
+export const metadata = {
+  title: 'Contact',
+  description: 'Send a message to your inbox.'
+};
+
+export default function ContactPage() {
+  return (
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
+      <h1 className="text-base font-bold">Contact</h1>
+      <p className="text-base">Send a message to your inbox.</p>
+      <ContactForm />
+    </section>
+  );
 }
 `;
 }
@@ -573,6 +616,49 @@ function renderNextEnvList(envVars: ModuleEnvVar[]): string {
     .join('\n');
 }
 
+function renderNextConnectionSection(_connections: ModuleConnection[]): string {
+  return '<ConnectionGuide />';
+}
+
+function nextConnectionGuideTemplate(connections: ModuleConnection[]): string {
+  const items = renderConnectionItems(connections);
+  return `import Link from 'next/link';
+
+const connections = ${items};
+
+export function ConnectionGuide() {
+  if (connections.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="text-base font-bold">Connection guide</h2>
+      {connections.map((item) => (
+        <div key={item.label} className="flex flex-col gap-1">
+          <Link
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-base font-bold underline underline-offset-4"
+          >
+            {item.label}
+          </Link>
+          <p className="text-base">
+            or go to{' '}
+            <Link href={item.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+              {item.url}
+            </Link>{' '}
+            directly.
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+`;
+}
+
 function expoLayoutTemplate(): string {
   return `import { Stack } from 'expo-router';
 import { TamaguiProvider, Theme } from 'tamagui';
@@ -604,6 +690,7 @@ function expoHomeTemplate(appName: string, domain: string, envItems: string): st
 import { Text, YStack } from 'tamagui';
 import { PageShell } from '../components/page-shell';
 import { EnvList } from '../components/env-list';
+import { ConnectionGuide } from '../components/connection-guide';
 import { ContactForm } from '../components/contact-form';
 import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from '../components/theme';
 
@@ -629,14 +716,37 @@ export default function Home() {
         </Text>
         <EnvList />
       </YStack>
+      <ConnectionGuide />
       <YStack gap="$2">
         <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
           Routes
         </Text>
         <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
-          Visit /about and /guide.
+          Visit /about, /guide, and /contact.
         </Text>
       </YStack>
+      <ContactForm />
+    </PageShell>
+  );
+}
+`;
+}
+
+function expoContactTemplate(): string {
+  return `import { Head } from 'expo-router/head';
+import { PageShell } from '../components/page-shell';
+import { ContactForm } from '../components/contact-form';
+
+export default function Contact() {
+  return (
+    <PageShell title="Contact" subtitle="Send a message to your inbox.">
+      <Head>
+        <title>Contact</title>
+        <meta name="description" content="Send a message to your inbox." />
+        <meta property="og:title" content="Contact" />
+        <meta property="og:description" content="Send a message to your inbox." />
+        <meta property="twitter:card" content="summary_large_image" />
+      </Head>
       <ContactForm />
     </PageShell>
   );
@@ -704,7 +814,8 @@ import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/guide', label: 'Guide' }
+  { href: '/guide', label: 'Guide' },
+  { href: '/contact', label: 'Contact' }
 ];
 
 export function SiteHeader() {
@@ -826,13 +937,63 @@ export function EnvList() {
 `;
 }
 
+function expoConnectionGuideTemplate(connectionItems: string): string {
+  return `import { Linking } from 'react-native';
+import { Text, YStack } from 'tamagui';
+import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
+
+const connections = ${connectionItems};
+
+export function ConnectionGuide() {
+  const { fg } = useThemeColors();
+
+  if (connections.length === 0) {
+    return null;
+  }
+
+  return (
+    <YStack gap="$3">
+      <Text fontFamily={FONT_BOLD} fontSize={FONT_SIZE} color={fg}>
+        Connection guide
+      </Text>
+      {connections.map((item) => (
+        <YStack key={item.label} gap="$1">
+          <Text
+            fontFamily={FONT_BOLD}
+            fontSize={FONT_SIZE}
+            color={fg}
+            textDecorationLine="underline"
+            onPress={() => Linking.openURL(item.url)}
+          >
+            {item.label}
+          </Text>
+          <Text fontFamily={FONT_REGULAR} fontSize={FONT_SIZE} color={fg}>
+            or go to{' '}
+            <Text
+              fontFamily={FONT_REGULAR}
+              fontSize={FONT_SIZE}
+              color={fg}
+              textDecorationLine="underline"
+              onPress={() => Linking.openURL(item.url)}
+            >
+              {item.url}
+            </Text>{' '}
+            directly.
+          </Text>
+        </YStack>
+      ))}
+    </YStack>
+  );
+}
+`;
+}
+
 function expoContactFormTemplate(): string {
   return `import { useState } from 'react';
-import { Linking, TextInput } from 'react-native';
+import { TextInput } from 'react-native';
 import { Button, Text, YStack } from 'tamagui';
 import { FONT_BOLD, FONT_REGULAR, FONT_SIZE, useThemeColors } from './theme';
 
-const CONTACT_EMAIL = process.env.EXPO_PUBLIC_CONTACT_EMAIL?.trim() ?? '';
 const CONTACT_ENDPOINT = process.env.EXPO_PUBLIC_CONTACT_ENDPOINT?.trim() ?? '';
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';
@@ -861,46 +1022,34 @@ export function ContactForm() {
       return;
     }
 
+    if (!CONTACT_ENDPOINT) {
+      setStatus('error');
+      setError('Set EXPO_PUBLIC_CONTACT_ENDPOINT.');
+      return;
+    }
+
     setStatus('sending');
     setError('');
 
     let sent = false;
-    if (CONTACT_ENDPOINT) {
-      try {
-        const response = await fetch(CONTACT_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name.trim(),
-            email: email.trim(),
-            message: message.trim()
-          })
-        });
-        sent = response.ok;
-      } catch {
-        sent = false;
-      }
-    }
-
-    if (!sent && CONTACT_EMAIL) {
-      const subject = encodeURIComponent(\`New message from \${name.trim()}\`);
-      const body = encodeURIComponent(\`Name: \${name.trim()}\\nEmail: \${email.trim()}\\n\\n\${message.trim()}\`);
-      const url = \`mailto:\${CONTACT_EMAIL}?subject=\${subject}&body=\${body}\`;
-      try {
-        await Linking.openURL(url);
-        sent = true;
-      } catch {
-        sent = false;
-      }
+    try {
+      const response = await fetch(CONTACT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          message: message.trim()
+        })
+      });
+      sent = response.ok;
+    } catch {
+      sent = false;
     }
 
     if (!sent) {
       setStatus('error');
-      if (CONTACT_ENDPOINT || CONTACT_EMAIL) {
-        setError('Unable to send message.');
-      } else {
-        setError('Set EXPO_PUBLIC_CONTACT_ENDPOINT or EXPO_PUBLIC_CONTACT_EMAIL.');
-      }
+      setError('Unable to send message.');
       return;
     }
 
@@ -1079,6 +1228,21 @@ function renderExpoEnvItems(envVars: ModuleEnvVar[]): string {
       key: '${escapeTemplate(item.key)}',
       description: '${escapeTemplate(item.description)}',
       url: ${url}
+    }`;
+  });
+  return `[
+    ${items.join(',\n    ')}
+  ]`;
+}
+
+function renderConnectionItems(connections: ModuleConnection[]): string {
+  if (connections.length === 0) {
+    return '[]';
+  }
+  const items = connections.map((item) => {
+    return `{
+      label: '${escapeTemplate(item.label)}',
+      url: '${escapeTemplate(item.url)}'
     }`;
   });
   return `[
