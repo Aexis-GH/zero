@@ -80,6 +80,8 @@ export const frameworks: FrameworkDefinition[] = [
     description: 'Expo app with Router and EAS configuration.',
     packages: [
       'expo-router',
+      'expo-font',
+      '@expo-google-fonts/geist-mono',
       'tamagui',
       '@tamagui/config',
       '@tamagui/animations-react-native',

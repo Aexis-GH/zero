@@ -3,17 +3,13 @@ import { promises as fs } from 'fs';
 import { execa } from 'execa';
 import type { ProjectConfig } from '../types.js';
 import { getFrameworkDefinition } from '../config/frameworks.js';
+import { getModuleEnvHelp } from '../config/modules.js';
 import { installBaseDependencies, installModulePackages } from './installers.js';
 import { writeEnvExample } from './env.js';
 import {
-  nextLayoutTemplate,
-  nextPageTemplate,
-  shadcnUtilsTemplate,
-  componentsJsonTemplate,
-  tamaguiConfigTemplate,
-  metroConfigTemplate,
-  expoLayoutTemplate,
-  expoIndexTemplate
+  buildNextTemplateFiles,
+  buildExpoTemplateFiles,
+  componentsJsonTemplate
 } from './templates.js';
 
 const baseEnv = {
@@ -22,19 +18,25 @@ const baseEnv = {
 };
 
 export async function scaffoldProject(config: ProjectConfig): Promise<void> {
-  const targetDir = path.resolve(process.cwd(), config.appName);
+  const directoryInput = config.directory.trim().length === 0 ? '.' : config.directory.trim();
+  const targetDir = path.resolve(process.cwd(), directoryInput);
   await ensureEmptyTargetDir(targetDir);
 
   const framework = getFrameworkDefinition(config.framework);
 
   console.log(`Scaffolding ${framework.label}...`);
-  await runScaffoldCommand(framework.scaffold.command, framework.scaffold.packageName, config.appName, framework.scaffold.argSets);
+  await runScaffoldCommand(
+    framework.scaffold.command,
+    framework.scaffold.packageName,
+    directoryInput,
+    framework.scaffold.argSets
+  );
 
   console.log('Applying framework templates...');
   if (config.framework === 'nextjs') {
-    await applyNextTemplates(targetDir);
+    await applyNextTemplates(config, targetDir);
   } else {
-    await applyExpoTemplates(targetDir);
+    await applyExpoTemplates(config, targetDir);
   }
 
   console.log('Installing base dependencies with Bun...');
@@ -47,7 +49,7 @@ export async function scaffoldProject(config: ProjectConfig): Promise<void> {
   await writeEnvExample(config.modules, targetDir);
 
   console.log('Scaffold complete.');
-  const cdTarget = config.appName.includes(' ') ? `"${config.appName}"` : config.appName;
+  const cdTarget = directoryInput === '.' ? '.' : directoryInput.includes(' ') ? `"${directoryInput}"` : directoryInput;
   console.log(`\nNext steps:\n  1) cd ${cdTarget}\n  2) bun run dev`);
 }
 
@@ -72,13 +74,14 @@ async function ensureEmptyTargetDir(targetDir: string): Promise<void> {
 async function runScaffoldCommand(
   command: string,
   packageName: string,
-  appName: string,
+  directoryInput: string,
   argSets: string[][]
 ): Promise<void> {
   const errors: string[] = [];
+  const targetArg = directoryInput === '.' ? '.' : directoryInput;
   for (const args of argSets) {
     try {
-      await execa(command, [packageName, appName, ...args], {
+      await execa(command, [packageName, targetArg, ...args], {
         stdio: 'inherit',
         env: baseEnv,
         shell: false
@@ -94,34 +97,53 @@ async function runScaffoldCommand(
   throw new Error(message);
 }
 
-async function applyNextTemplates(targetDir: string): Promise<void> {
-  const rootAppDir = path.join(targetDir, 'app');
+async function applyNextTemplates(config: ProjectConfig, targetDir: string): Promise<void> {
   const srcAppDir = path.join(targetDir, 'src', 'app');
   const usesSrcDir = await pathExists(srcAppDir);
-  const appDir = usesSrcDir ? srcAppDir : rootAppDir;
-  const projectSrcBase = usesSrcDir ? path.join(targetDir, 'src') : targetDir;
-  await fs.mkdir(appDir, { recursive: true });
-  await fs.writeFile(path.join(appDir, 'layout.tsx'), nextLayoutTemplate, 'utf8');
-  await fs.writeFile(path.join(appDir, 'page.tsx'), nextPageTemplate, 'utf8');
-  await ensureShadcnSetup(targetDir, projectSrcBase, usesSrcDir);
+  const basePath = usesSrcDir ? 'src' : '';
+  const envHelp = getModuleEnvHelp(config.modules);
+
+  const files = buildNextTemplateFiles({
+    appName: config.appName,
+    domain: config.domain,
+    envVars: envHelp,
+    basePath
+  });
+
+  await writeTemplateFiles(targetDir, files);
+
+  const globalsPath = usesSrcDir ? 'src/app/globals.css' : 'app/globals.css';
+  const tailwindConfig = await detectTailwindConfig(targetDir);
+  const componentsJson = componentsJsonTemplate(globalsPath, tailwindConfig ?? 'tailwind.config.ts');
+  await fs.writeFile(path.join(targetDir, 'components.json'), componentsJson, 'utf8');
+
   await ensureNextTurbo(targetDir);
+  await ensurePackageName(targetDir, config.appName);
 }
 
-async function applyExpoTemplates(targetDir: string): Promise<void> {
-  const appDir = path.join(targetDir, 'app');
-  await fs.mkdir(appDir, { recursive: true });
-  await fs.writeFile(path.join(appDir, '_layout.tsx'), expoLayoutTemplate, 'utf8');
-  await fs.writeFile(path.join(appDir, 'index.tsx'), expoIndexTemplate, 'utf8');
-  await ensureExpoConfig(targetDir);
-  await ensureExpoTamagui(targetDir);
+async function applyExpoTemplates(config: ProjectConfig, targetDir: string): Promise<void> {
+  const envHelp = getModuleEnvHelp(config.modules);
+  const files = buildExpoTemplateFiles({
+    appName: config.appName,
+    domain: config.domain,
+    envVars: envHelp,
+    basePath: ''
+  });
+
+  await writeTemplateFiles(targetDir, files);
+  await ensureExpoConfig(targetDir, config.appName);
+  await ensurePackageName(targetDir, config.appName);
 }
 
-async function ensureExpoConfig(targetDir: string): Promise<void> {
+async function ensureExpoConfig(targetDir: string, appName: string): Promise<void> {
   const appJsonPath = path.join(targetDir, 'app.json');
   const appJson = await readJson<Record<string, any>>(appJsonPath, { expo: {} });
   if (!appJson.expo || typeof appJson.expo !== 'object') {
     appJson.expo = {};
   }
+
+  appJson.expo.name = appName;
+  appJson.expo.slug = toSlug(appName);
 
   if (!Array.isArray(appJson.expo.platforms)) {
     appJson.expo.platforms = ['ios', 'android', 'macos', 'windows'];
@@ -164,12 +186,56 @@ async function ensureExpoConfig(targetDir: string): Promise<void> {
   await writeJson(easPath, easConfig);
 }
 
+async function ensureNextTurbo(targetDir: string): Promise<void> {
+  const packageJsonPath = path.join(targetDir, 'package.json');
+  const packageJson = await readJson<Record<string, any>>(packageJsonPath, {});
+  if (!packageJson.scripts || typeof packageJson.scripts !== 'object') {
+    packageJson.scripts = {};
+  }
+  const currentDev = typeof packageJson.scripts.dev === 'string' ? packageJson.scripts.dev : 'next dev';
+  if (!currentDev.includes('--turbo')) {
+    packageJson.scripts.dev = `${currentDev} --turbo`;
+  }
+  await writeJson(packageJsonPath, packageJson);
+}
+
+async function ensurePackageName(targetDir: string, appName: string): Promise<void> {
+  const packageJsonPath = path.join(targetDir, 'package.json');
+  const packageJson = await readJson<Record<string, any>>(packageJsonPath, {});
+  packageJson.name = toPackageName(appName);
+  await writeJson(packageJsonPath, packageJson);
+}
+
+async function writeTemplateFiles(targetDir: string, files: Array<{ path: string; content: string }>): Promise<void> {
+  for (const file of files) {
+    const fullPath = path.join(targetDir, ...file.path.split('/'));
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, file.content, 'utf8');
+  }
+}
+
 function mergeUnique(values: string[], additions: string[]): string[] {
   const set = new Set(values);
   for (const value of additions) {
     set.add(value);
   }
   return Array.from(set);
+}
+
+async function detectTailwindConfig(targetDir: string): Promise<string | null> {
+  const candidates = [
+    'tailwind.config.ts',
+    'tailwind.config.js',
+    'tailwind.config.cjs',
+    'tailwind.config.mjs'
+  ];
+  for (const filename of candidates) {
+    const fullPath = path.join(targetDir, filename);
+    if (await pathExists(fullPath)) {
+      return filename;
+    }
+  }
+  return null;
 }
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -212,85 +278,21 @@ async function pathExists(targetPath: string): Promise<boolean> {
   }
 }
 
-async function ensureNextTurbo(targetDir: string): Promise<void> {
-  const packageJsonPath = path.join(targetDir, 'package.json');
-  const packageJson = await readJson<Record<string, any>>(packageJsonPath, {});
-  if (!packageJson.scripts || typeof packageJson.scripts !== 'object') {
-    packageJson.scripts = {};
-  }
-  const currentDev = typeof packageJson.scripts.dev === 'string' ? packageJson.scripts.dev : 'next dev';
-  if (!currentDev.includes('--turbo')) {
-    packageJson.scripts.dev = `${currentDev} --turbo`;
-  }
-  await writeJson(packageJsonPath, packageJson);
+function toPackageName(name: string): string {
+  const cleaned = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-._]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_.]+|[-_.]+$/g, '');
+  return cleaned || 'aexis-zero-app';
 }
 
-async function ensureShadcnSetup(targetDir: string, projectSrcBase: string, usesSrcDir: boolean): Promise<void> {
-  const libDir = path.join(projectSrcBase, 'lib');
-  await fs.mkdir(libDir, { recursive: true });
-  await fs.writeFile(path.join(libDir, 'utils.ts'), shadcnUtilsTemplate, 'utf8');
-
-  const globalsPath = usesSrcDir ? 'src/app/globals.css' : 'app/globals.css';
-  const tailwindConfigPath = await detectTailwindConfig(targetDir);
-  const componentsJson = componentsJsonTemplate(globalsPath, tailwindConfigPath ?? 'tailwind.config.ts');
-  await fs.writeFile(path.join(targetDir, 'components.json'), componentsJson, 'utf8');
-}
-
-async function detectTailwindConfig(targetDir: string): Promise<string | null> {
-  const candidates = [
-    'tailwind.config.ts',
-    'tailwind.config.js',
-    'tailwind.config.cjs',
-    'tailwind.config.mjs'
-  ];
-  for (const filename of candidates) {
-    const fullPath = path.join(targetDir, filename);
-    if (await pathExists(fullPath)) {
-      return filename;
-    }
-  }
-  return null;
-}
-
-async function ensureExpoTamagui(targetDir: string): Promise<void> {
-  const configPath = path.join(targetDir, 'tamagui.config.ts');
-  await fs.writeFile(configPath, tamaguiConfigTemplate, 'utf8');
-
-  const metroPath = path.join(targetDir, 'metro.config.js');
-  await fs.writeFile(metroPath, metroConfigTemplate, 'utf8');
-
-  await ensureBabelTamagui(targetDir);
-}
-
-async function ensureBabelTamagui(targetDir: string): Promise<void> {
-  const babelPath = path.join(targetDir, 'babel.config.js');
-  let content = '';
-  if (await pathExists(babelPath)) {
-    content = await fs.readFile(babelPath, 'utf8');
-  }
-
-  if (!content) {
-    const defaultConfig = `module.exports = function (api) {\n  api.cache(true);\n  return {\n    presets: ['babel-preset-expo'],\n    plugins: [\n      'expo-router/babel',\n      [\n        '@tamagui/babel-plugin',\n        {\n          config: './tamagui.config.ts',\n          components: ['tamagui']\n        }\n      ]\n    ]\n  };\n};\n`;
-    await fs.writeFile(babelPath, defaultConfig, 'utf8');
-    return;
-  }
-
-  if (content.includes('@tamagui/babel-plugin')) {
-    return;
-  }
-
-  const pluginSnippet = `[\n        '@tamagui/babel-plugin',\n        {\n          config: './tamagui.config.ts',\n          components: ['tamagui']\n        }\n      ]`;
-
-  const pluginsRegex = /plugins:\\s*\\[(.*)\\]/s;
-  if (pluginsRegex.test(content)) {
-    content = content.replace(pluginsRegex, (match, inner) => {
-      const trimmed = inner.trim();
-      const updatedInner = trimmed.length > 0 ? `${trimmed},\n      ${pluginSnippet}` : pluginSnippet;
-      return `plugins: [${updatedInner}]`;
-    });
-  } else {
-    content = content.replace(/return\\s*\\{/, (match) => `${match}\n    plugins: [${pluginSnippet}],`);
-  }
-
-  await fs.writeFile(babelPath, content, 'utf8');
+function toSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'aexis-zero-app';
 }

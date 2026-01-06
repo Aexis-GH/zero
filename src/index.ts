@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-import React from 'react';
-import { render } from 'ink';
-import { App } from './ui/App.js';
+import { runWizard } from './cli/prompts.js';
 import { assertBunAvailable } from './env/detect.js';
 import { scaffoldProject } from './engine/scaffold.js';
 import type { ProjectConfig } from './types.js';
@@ -16,19 +14,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  let config: ProjectConfig | null = null;
-  const { waitUntilExit } = render(
-    <App
-      onComplete={(result) => {
-        config = result;
-      }}
-    />
-  );
-
-  await waitUntilExit();
-
+  const config: ProjectConfig | null = await runWizard();
   if (!config) {
-    console.log('Cancelled.');
     return;
   }
 
