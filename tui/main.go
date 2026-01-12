@@ -5,8 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,7 +19,8 @@ import (
 type step int
 
 const (
-	stepDirectory step = iota
+	stepStartup step = iota
+	stepDirectory
 	stepName
 	stepDomain
 	stepFramework
@@ -43,11 +47,6 @@ var frameworkOptions = []framework{frameworkNext, frameworkExpo}
 
 var packageManagerOptions = []packageManager{"npm", "pnpm", "yarn", "bun"}
 
-const (
-	colorLight = "#E7E5E4"
-	colorDark  = "#1C1917"
-)
-
 type config struct {
 	Directory string   `json:"directory"`
 	AppName   string   `json:"appName"`
@@ -55,6 +54,14 @@ type config struct {
 	Framework string   `json:"framework"`
 	Modules   []string `json:"modules"`
 	Package   string   `json:"packageManager"`
+}
+
+type particle struct {
+	baseRadius   float64
+	baseAngle    float64
+	offsetRadius float64
+	offsetAngle  float64
+	speed        float64
 }
 
 type model struct {
@@ -70,20 +77,21 @@ type model struct {
 	err          string
 	result       *config
 	cancelled    bool
-	fg           lipgloss.Color
-	muted        lipgloss.Color
-	accent       lipgloss.Color
+	fg           lipgloss.AdaptiveColor
+	muted        lipgloss.AdaptiveColor
+	accent       lipgloss.AdaptiveColor
+
+	// Slashed zero animation
+	particles   []*particle
+	startupTime time.Time
+	rotation    float64
 }
 
 func newModel() model {
-	fg := lipgloss.Color(colorDark)
-	muted := lipgloss.Color(colorDark)
-	accent := lipgloss.Color(colorDark)
-	if lipgloss.HasDarkBackground() {
-		fg = lipgloss.Color(colorLight)
-		muted = lipgloss.Color(colorLight)
-		accent = lipgloss.Color(colorLight)
-	}
+	// Use terminal colors for proper visibility
+	fg := lipgloss.AdaptiveColor{Light: "#1C1917", Dark: "#E7E5E4"}
+	muted := lipgloss.AdaptiveColor{Light: "#6B7280", Dark: "#9CA3AF"}
+	accent := lipgloss.AdaptiveColor{Light: "#374151", Dark: "#D1D5DB"}
 
 	dirInput := textinput.New()
 	dirInput.Placeholder = "."
@@ -92,32 +100,96 @@ func newModel() model {
 	dirInput.CharLimit = 120
 
 	nameInput := textinput.New()
-	nameInput.Placeholder = "my-app"
 	nameInput.CharLimit = 80
+	nameInput.Focus()
 
 	domainInput := textinput.New()
-	domainInput.Placeholder = "example.com"
 	domainInput.CharLimit = 120
 
+	// Create particles for slashed zero shape
+	particles := make([]*particle, 0)
+
+	// Create circle outline
+	for i := 0; i < 120; i++ {
+		angle := float64(i) / 120.0 * 2.0 * math.Pi
+		particle := &particle{
+			baseRadius:   12.0,
+			baseAngle:    angle,
+			offsetRadius: 0,
+			offsetAngle:  0,
+			speed:        0.02 + rand.Float64()*0.01,
+		}
+		particles = append(particles, particle)
+	}
+
+	// Create diagonal slash
+	for i := 0; i < 40; i++ {
+		t := float64(i) / 39.0
+		x := -8.0 + t*16.0
+		y := 8.0 - t*16.0
+		angle := math.Atan2(y, x)
+		radius := math.Sqrt(x*x + y*y)
+
+		particle := &particle{
+			baseRadius:   radius,
+			baseAngle:    angle,
+			offsetRadius: 0,
+			offsetAngle:  0,
+			speed:        0.02 + rand.Float64()*0.01,
+		}
+		particles = append(particles, particle)
+	}
+
 	return model{
-		step:      stepDirectory,
-		directory: dirInput,
-		name:      nameInput,
-		domain:    domainInput,
-		selected:  map[module]bool{},
-		fg:        fg,
-		muted:     muted,
-		accent:    accent,
+		step:        stepStartup,
+		directory:   dirInput,
+		name:        nameInput,
+		domain:      domainInput,
+		selected:    map[module]bool{},
+		fg:          fg,
+		muted:       muted,
+		accent:      accent,
+		particles:   particles,
+		startupTime: time.Now(),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+		return animationFrameMsg(t)
+	}))
 }
+
+type animationFrameMsg time.Time
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case animationFrameMsg:
+		// Update rotation slowly
+		m.rotation += 0.008
+
+		// Update particle positions
+		for _, particle := range m.particles {
+			particle.offsetRadius = math.Sin(m.rotation*particle.speed) * 0.5
+			particle.offsetAngle = math.Cos(m.rotation*particle.speed*1.5) * 0.1
+		}
+
+		if m.step == stepStartup && time.Since(m.startupTime) > time.Second*3 {
+			m.step = stepDirectory
+			m.directory.Focus()
+		}
+
+		return m, tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+			return animationFrameMsg(t)
+		})
+
 	case tea.KeyMsg:
+		if m.step == stepStartup {
+			m.step = stepDirectory
+			m.directory.Focus()
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.cancelled = true
@@ -160,6 +232,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			value = "."
 		}
 		m.directory.SetValue(value)
+		m.directory.Blur()
 		m.step = stepName
 		m.name.Focus()
 		return m, nil
@@ -169,6 +242,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.err = "App name is required."
 			return m, nil
 		}
+		m.name.Blur()
 		m.step = stepDomain
 		m.domain.Focus()
 		return m, nil
@@ -246,7 +320,7 @@ func (m model) handleDown() (tea.Model, tea.Cmd) {
 			m.frameworkIdx++
 		}
 	case stepModules:
-		if m.moduleIdx < len(moduleOptions)-1 {
+		if m.moduleIdx > 0 {
 			m.moduleIdx++
 		}
 	case stepConfirm:
@@ -281,19 +355,14 @@ func (m model) View() string {
 
 	base := lipgloss.NewStyle().Foreground(m.fg)
 	muted := lipgloss.NewStyle().Foreground(m.muted)
-	accent := lipgloss.NewStyle().Foreground(m.accent)
 
-	asciiZero := `
-  ___  
- / _ \ 
-| / /|
-|/ / |
-|\ \ |
- \_\_\
-`
+	if m.step == stepStartup {
+		return m.renderStartup()
+	}
 
-	header := accent.Render(asciiZero) + "\n" + accent.Render("ZER0") + "  " + base.Render("Aexis Zero")
-	divider := strings.Repeat("-", 42)
+	// Header with mini slashed zero
+	header := m.renderMiniSlashedZero()
+	divider := strings.Repeat("─", 80)
 
 	content := ""
 	if m.err != "" {
@@ -331,19 +400,108 @@ func (m model) View() string {
 	return strings.Join([]string{header, divider, content, divider, footer}, "\n")
 }
 
+func (m model) renderSlashedZero() string {
+	// Create field for slashed zero
+	field := make([][]string, 16)
+	for i := range field {
+		field[i] = make([]string, 80)
+		for j := range field[i] {
+			field[i][j] = " "
+		}
+	}
+
+	// Place particles
+	for _, particle := range m.particles {
+		angle := particle.baseAngle + m.rotation + particle.offsetAngle
+		radius := particle.baseRadius + particle.offsetRadius
+
+		x := 40.0 + radius*math.Cos(angle)
+		y := 8.0 + radius*math.Sin(angle)
+
+		ix, iy := int(x), int(y)
+		if iy >= 0 && iy < 16 && ix >= 0 && ix < 80 {
+			style := lipgloss.NewStyle().Foreground(m.accent)
+			field[iy][ix] = style.Render("•")
+		}
+	}
+
+	// Build display
+	var lines []string
+	for _, row := range field {
+		lines = append(lines, strings.Join(row, ""))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m model) renderMiniSlashedZero() string {
+	// Small version for header
+	field := make([][]string, 6)
+	for i := range field {
+		field[i] = make([]string, 80)
+		for j := range field[i] {
+			field[i][j] = " "
+		}
+	}
+
+	// Scale down particles for mini version
+	for _, particle := range m.particles {
+		angle := particle.baseAngle + m.rotation + particle.offsetAngle
+		radius := (particle.baseRadius + particle.offsetRadius) * 0.3
+
+		x := 40.0 + radius*math.Cos(angle)
+		y := 2.5 + radius*math.Sin(angle)
+
+		ix, iy := int(x), int(y)
+		if iy >= 0 && iy < 6 && ix >= 0 && ix < 80 {
+			style := lipgloss.NewStyle().Foreground(m.muted)
+			field[iy][ix] = style.Render("·")
+		}
+	}
+
+	// Build display
+	var lines []string
+	for _, row := range field {
+		lines = append(lines, strings.Join(row, ""))
+	}
+
+	result := strings.Join(lines, "\n")
+	title := lipgloss.NewStyle().Foreground(m.fg).Render("ZER0")
+
+	return result + "\n" + title
+}
+
+func (m model) renderStartup() string {
+	muted := lipgloss.NewStyle().Foreground(m.muted)
+
+	// Full screen slashed zero animation
+	slashedZero := m.renderSlashedZero()
+
+	// Message below
+	subtitle := muted.Render("Starting from 0...")
+	subtitleLine := strings.Repeat(" ", 36) + subtitle
+
+	return slashedZero + "\n\n" + subtitleLine
+}
+
 func renderFrameworkOptions(active int) string {
 	labels := []string{"Next.js", "Expo"}
 	lines := make([]string, 0, len(labels))
 	for i, label := range labels {
 		cursor := " "
 		if i == active {
-			cursor = ">"
+			cursor = "▶"
 		}
-		mark := "( )"
+		// Cool radio design
+		radio := "○"
 		if i == active {
-			mark = "(•)"
+			radio = "◉"
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, label))
+		style := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#1C1917", Dark: "#E7E5E4"})
+		if i == active {
+			style = style.Foreground(lipgloss.AdaptiveColor{Light: "#374151", Dark: "#D1D5DB"})
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, radio, style.Render(label)))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -353,13 +511,18 @@ func renderModuleOptions(active int, selected map[module]bool) string {
 	for i, label := range moduleLabels {
 		cursor := " "
 		if i == active {
-			cursor = ">"
+			cursor = "▶"
 		}
-		mark := "[ ]"
+		// Cool checkbox design
+		checkbox := "□"
 		if selected[moduleOptions[i]] {
-			mark = "[x]"
+			checkbox = "■"
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, label))
+		style := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#1C1917", Dark: "#E7E5E4"})
+		if i == active {
+			style = style.Foreground(lipgloss.AdaptiveColor{Light: "#374151", Dark: "#D1D5DB"})
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, checkbox, style.Render(label)))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -378,13 +541,18 @@ func renderConfirm(active int) string {
 	for i, action := range actions {
 		cursor := " "
 		if i == active {
-			cursor = ">"
+			cursor = "▶"
 		}
-		mark := "( )"
+		// Cool selection indicator
+		indicator := "○"
 		if i == active {
-			mark = "(•)"
+			indicator = "◉"
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, action))
+		style := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#1C1917", Dark: "#E7E5E4"})
+		if i == active {
+			style = style.Foreground(lipgloss.AdaptiveColor{Light: "#374151", Dark: "#D1D5DB"})
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, indicator, style.Render(action)))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -395,13 +563,18 @@ func renderPackageManagerOptions(active int) string {
 	for i, label := range labels {
 		cursor := " "
 		if i == active {
-			cursor = ">"
+			cursor = "▶"
 		}
-		mark := "( )"
+		// Cool radio design
+		radio := "○"
 		if i == active {
-			mark = "(•)"
+			radio = "◉"
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, mark, label))
+		style := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#1C1917", Dark: "#E7E5E4"})
+		if i == active {
+			style = style.Foreground(lipgloss.AdaptiveColor{Light: "#374151", Dark: "#D1D5DB"})
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", cursor, radio, style.Render(label)))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -441,7 +614,7 @@ func main() {
 	outputPath := flag.String("output", "", "path to write json output")
 	flag.Parse()
 
-	program := tea.NewProgram(newModel())
+	program := tea.NewProgram(newModel(), tea.WithAltScreen())
 	finalModel, err := program.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
